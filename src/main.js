@@ -1,0 +1,591 @@
+// Château Cashflow — main.js
+// Opstarten, schaling, invoer, fases (titel → voorbereiden → verkoop → kassabon → zondag).
+(function () {
+  const CC = window.CC;
+  const R = CC.R, UI = CC.UI, SIM = CC.SIM, DAY = CC.DAY, DBG = CC.DBG, P = CC.PAL;
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  canvas.width = R.W; canvas.height = R.H;
+  ctx.imageSmoothingEnabled = false;
+
+  const app = {
+    s: null, phase: 'title', day: null, summary: null,
+    panel: null, panelVak: null, panelT: 0,
+    speed: 1, acc: 0, t: 0, resultT: 0, resultQuip: '',
+    mouse: { x: -1, y: -1 }, hoverId: null, click: null,
+    worldRects: {}, images: {}, hasSave: CC.hasSave(), hasBackup: CC.hasBackup(), saveFailed: false, confirmNew: false,
+    roomLevel: 0, phaseT: 0, levelQuip: '', sunday: null, advice: null,
+  };
+  window.app = app; // handig voor debug in de console
+
+  // ---------- Afbeeldingen ----------
+  const logo = new Image(); logo.src = 'assets/logo_main.png'; app.images.logo = logo;
+  if (CC.TITLE) { const tb = new Image(); tb.src = CC.TITLE.image; app.images.title = tb; }
+  const loadImg = (k, src) => { const im = new Image(); im.src = src; app.images[k] = im; return im; };
+  if (CC.SPRITES) for (const t in CC.SPRITES) for (const v in CC.SPRITES[t]) loadImg('chr_' + t + '_' + v, CC.SPRITES[t][v].src);
+  if (CC.PORTRAITS) for (const who in CC.PORTRAITS) for (const m in CC.PORTRAITS[who]) loadImg('por_' + who + '_' + m, CC.PORTRAITS[who][m].src);
+  if (CC.BG) { loadImg('bg', CC.BG.image); for (const k in CC.BG.layers) loadImg('layer_' + k, CC.BG.layers[k]); }
+  if (CC.WINE_SPRITES) for (const id in CC.WINE_SPRITES) for (const sz in CC.WINE_SPRITES[id]) loadImg('wine_' + id.slice(5) + '_' + sz, CC.WINE_SPRITES[id][sz].src);
+  if (CC.CARD_ART) for (const id in CC.CARD_ART) loadImg('card_' + id, CC.CARD_ART[id].src);
+  if (CC.CRITTERS) for (const k in CC.CRITTERS) loadImg('crit_' + k, CC.CRITTERS[k].src);
+  if (CC.TILES) for (const k in CC.TILES) loadImg('tile_' + k, CC.TILES[k].src);
+  if (CC.ICONS) for (const k in CC.ICONS) loadImg('icon_' + k, CC.ICONS[k].src);
+  if (CC.DECOR_TILES) for (const lv in CC.DECOR_TILES) loadImg('tile_decor' + lv, CC.DECOR_TILES[lv]);
+  CC.IMAGES = app.images;
+  const logoSign = new Image(); logoSign.onload = () => { R.roomCache = null; }; logoSign.src = 'assets/logo_sign.png'; app.images.logoSign = logoSign;
+
+  // ---------- Schaling: integer in apparaatpixels ----------
+  function fit() {
+    const dpr = window.devicePixelRatio || 1;
+    const s = Math.max(1, Math.floor(Math.min(window.innerWidth * dpr / R.W, window.innerHeight * dpr / R.H)));
+    canvas.style.width = (R.W * s / dpr) + 'px';
+    canvas.style.height = (R.H * s / dpr) + 'px';
+    app.scale = s / dpr;
+  }
+  window.addEventListener('resize', fit); fit();
+
+  function toGame(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: Math.floor((e.clientX - r.left) / r.width * R.W), y: Math.floor((e.clientY - r.top) / r.height * R.H) };
+  }
+  canvas.addEventListener('mousemove', e => { app.mouse = toGame(e); });
+  canvas.addEventListener('mouseleave', () => { app.mouse = { x: -1, y: -1 }; });
+  canvas.addEventListener('mousedown', e => { if (e.button === 0) app.click = toGame(e); });
+  window.addEventListener('keydown', e => {
+    if (app.codeOpen) { if (e.key === 'Escape') app.closeCode(); return; }   // typen in het codevenster
+    if (app.confirmNew) { if (e.key === 'Escape') app.confirmNew = false; if (e.key === 'Enter') app.newGame(); return; }
+    if (e.key === 'F1') { e.preventDefault(); DBG.on = !DBG.on; }
+    if (app.advice) {
+      const A = app.advice;
+      if (e.key === 'Escape') app.closeAdvice();
+      if (A.stage === 'ask') {
+        const i = parseInt(e.key, 10) - 1;
+        if (A.c.ask && i >= 0 && i < A.c.ask.opts.length) app.answerAdvice(A.c.ask.opts[i]);
+        if (e.key === 'n' || e.key === 'N' || e.key === '0') app.answerAdvice(null);
+      } else if ((e.key === ' ' || e.key === 'Enter') && A.t > 0.3) { e.preventDefault(); app.closeAdvice(); }
+      return;
+    }
+    if (e.key === 'Escape') { if (app.shelfPick) app.shelfPick = null; else app.closePanel(); }
+    if (e.key === 'Tab' && app.panel === 'assort') { e.preventDefault(); app.assortTab = app.assortTab === 'prices' ? 'order' : 'prices'; app.shelfPick = null; }
+    if ((e.key === 'p' || e.key === 'P') && app.phase === 'prep' && app.s && app.staffOpen()) { if (app.panel === 'staff') app.closePanel(); else app.openPanel('staff'); }
+    if ((e.key === 'i' || e.key === 'I') && app.phase === 'prep' && app.s && app.investOpen()) { if (app.panel === 'invest') app.closePanel(); else app.openPanel('invest'); }
+    if ((e.key === 'g' || e.key === 'G') && app.phase === 'prep' && app.s && app.s.history.length) { if (app.panel === 'lastday') app.closePanel(); else app.openPanel('lastday'); }
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      if (app.phase === 'prep' && app.notice) app.closeNotice();
+      else if (app.phase === 'prep' && app.mishapMsg) app.mishapMsg = null;
+      else if (app.phase === 'prep' && !app.panel) app.openShop();
+      else if (app.phase === 'result' && app.resultT > 0.3) app.afterResult();
+      else if (app.phase === 'levelup' && app.phaseT > 0.4) app.afterLevel();
+      else if (app.phase === 'staffup' && app.phaseT > 0.4) app.afterStaffUp();
+      else if (app.phase === 'sunday' && app.ring) app.ring = null;
+      else if (app.phase === 'sunday' && app.sunday && app.sunday.stage === 'done') app.bankNextWeek();
+      else if (app.phase === 'prep' && app.mishapMsg) app.mishapMsg = null;
+    }
+    if (app.phase === 'sale') {
+      if (e.key === '1') app.setSpeed(1);
+      if (e.key === '2') app.setSpeed(2);
+      if (e.key === '3' || e.key === '4') app.setSpeed(4);
+      if (e.key === 's' || e.key === 'S') app.skipDay();
+    }
+  });
+
+  // ---------- Opslaan ----------
+  // Mislukt opslaan (vol, geblokkeerd)? Dan een blijvende melding in de HUD; de vorige goede save blijft staan.
+  app.save = function () {
+    if (!app.s) return;
+    const ok = CC.save(app.s);
+    app.saveFailed = !ok;
+    if (ok) app.hasSave = true;
+    return ok;
+  };
+
+  // ---------- Spelcode (export/import) ----------
+  const box = document.getElementById('codebox');
+  app.openCode = function (mode) {
+    if (!box) return;
+    const ta = box.querySelector('textarea'), msg = box.querySelector('.msg');
+    const go = box.querySelector('.go'), cp = box.querySelector('.copy');
+    box.querySelector('h2').textContent = mode === 'export' ? 'Je spelcode' : 'Spelcode laden';
+    msg.textContent = mode === 'export' ? 'Bewaar deze code (bijvoorbeeld in een notitie). Met "Code laden" op het titelscherm zet je het spel terug.' : 'Plak hier een spelcode. Je huidige spel wordt eerst de reservekopie.';
+    const st = app.s || CC.load();
+    ta.value = mode === 'export' && st ? CC.exportCode(st) : '';
+    ta.readOnly = mode === 'export';
+    cp.style.display = mode === 'export' ? '' : 'none';
+    go.style.display = mode === 'import' ? '' : 'none';
+    box.style.display = 'flex'; app.codeOpen = mode;
+    setTimeout(() => { ta.focus(); if (mode === 'export') ta.select(); }, 0);
+  };
+  app.closeCode = function () { if (box) box.style.display = 'none'; app.codeOpen = null; canvas.focus && canvas.focus(); };
+  if (box) {
+    const ta = box.querySelector('textarea'), msg = box.querySelector('.msg');
+    box.querySelector('.close').onclick = () => app.closeCode();
+    box.querySelector('.copy').onclick = () => {
+      ta.select();
+      const done = () => { msg.textContent = 'Gekopieerd.'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, () => { try { document.execCommand('copy'); done(); } catch (e) { /* */ } });
+      else { try { document.execCommand('copy'); done(); } catch (e) { /* */ } }
+    };
+    box.querySelector('.go').onclick = () => {
+      const st = CC.importCode(ta.value);
+      if (!st) { msg.textContent = 'Deze code klopt niet. Controleer of je hem helemaal hebt gekopieerd.'; return; }
+      app.hasSave = true; app.hasBackup = CC.hasBackup(); app.closeCode(); app.continueGame();
+    };
+  }
+
+  // ---------- Acties ----------
+  app.rebuildRoom = function () { R.roomCache = R.buildRoom(app.s ? app.s.level : 1, app.images); app.roomLevel = app.s ? app.s.level : 1; };
+  // Nieuw spel: bestaat er een lopend spel, dan eerst vragen (titelscherm) en het oude als reservekopie bewaren.
+  app.newGame = function () {
+    const old = CC.load();
+    if (old && (old.status === 'playing' || old.status === 'endless')) CC.backupSave();
+    app.hasBackup = CC.hasBackup();
+    app.confirmNew = false;
+    app.s = CC.newState(); app.rebuildRoom(); app.startPrep();
+  };
+  app.askNewGame = function () {
+    const old = app.hasSave && CC.load();
+    if (old && (old.status === 'playing' || old.status === 'endless') && (old.week > 1 || old.day > 0 || old.totals.days > 0)) { app.confirmOld = old; app.confirmNew = true; }
+    else app.newGame();
+  };
+  app.restoreBackup = function () { if (CC.restoreBackup()) { app.hasSave = CC.hasSave(); app.hasBackup = CC.hasBackup(); app.continueGame(); } };
+  // Hervatten precies waar je was: open kassabon, zondag (bank/kaarten), einde. Nooit een dag of betaling dubbel.
+  app.continueGame = function () {
+    const s = CC.load(); if (!s) return app.newGame();
+    app.s = s; app.rebuildRoom();
+    if (s.status === 'bankrupt') return app.setPhase('gameover');
+    if (s.status === 'won') return app.setPhase('won');
+    if (s.resultOpen && s.history.length) {
+      app.summary = s.history[s.history.length - 1];
+      app.resultQuip = CC.pickText(app.summary.margin > 60 ? CC.TEXT.result.goodDay : CC.TEXT.result.badDay);
+      app.phase = 'result'; app.phaseT = 0; app.panel = null; app.day = null;
+      app.resultT = 2;   // bedragen direct definitief
+      return;
+    }
+    if (s.day >= CC.CONFIG.daysPerWeek) return app.openSunday();
+    app.startPrep();
+  };
+  app.setPhase = function (p) { app.phase = p; app.phaseT = 0; app.panel = null; };
+  app.restart = function () { CC.clearSave(); app.hasSave = false; app.s = CC.newState(); app.rebuildRoom(); app.startPrep(); };
+  app.startPrep = function () {
+    app.phase = 'prep'; app.phaseT = 0; app.day = null; app.panel = null;
+    app.emptyWarn = false;
+    SIM.refill(app.s);
+    // ochtendlevering volgens de vaste bestelling
+    // Ronnie zet de bestelling klaar; er gaat pas geld af als je op "Bestellen" drukt (besluit 66, 1B)
+    app.delivery = null; app.ordered = false;
+    app.order = SIM.orderProposal(app.s);
+    // nieuw vrijgespeelde schaarse wijn: één keer uitleggen
+    const seen = app.s.flags.scarceSeen || [];
+    const sc = SIM.unlockedWines(app.s).find(w => CC.roleById(w.role).scarce && !seen.includes(w.id));
+    app.notice = sc ? { wine: sc.id } : null;
+    // opdracht van een weekkaart (bruiloft) die vanochtend afloopt
+    const ord = SIM.settleOrder(app.s);
+    if (ord) {
+      const T = CC.TEXT.orderNotice, txt = (ord.ok ? T.ok : T.fail).split('{paid}').join(R.euro(ord.paid || 0)).split('{rep}').join(ord.ok ? ord.rep : ord.rep).split('{have}').join(ord.have);
+      app.notice = { title: T.title, text: txt, good: ord.ok, next: app.notice };
+    }
+    // klik op het avondinzicht van gisteren: nu het venster op die wijn openen
+    // allereerste ochtend: de bankier legt het doel uit (M7, besluit 78)
+    if (!app.s.flags.introSeen && app.s.week === 1 && app.s.day === 0) {
+      const T = CC.TEXT.tutorial, R2 = CC.CONFIG.repay;
+      app.notice = { who: 'bankier', title: T.introTitle, text: T.intro.map(l => l.split('{first}').join(R.euro(R2[0])).split('{last}').join(R.euro(R2[R2.length - 1]))).join('\n'), btn: T.introBtn, flag: 'introSeen', next: app.notice };
+    }
+    if (app.pendingFocus) { const f = app.pendingFocus; app.pendingFocus = null; app.focusWine(f.tab, f.wine); }
+    app.save();
+  };
+  app.openPanel = function (p, vak) {
+    // bestellen, prijzen en schappen zitten samen in het middenvenster (besluit 66)
+    if (p === 'phone' || p === 'prices' || p.startsWith('vak:')) {
+      if (app.panel !== 'assort') app.panelT = 0;
+      app.assortTab = p === 'prices' ? 'prices' : 'order';
+      app.assortVak = p.startsWith('vak:') ? p.slice(4) : null;
+      app.shelfPick = null; app.orderMsg = null;
+      app.panel = 'assort'; app.panelSide = 'center';
+      return;
+    }
+    if (app.panel !== p && !(app.panel && app.panel.startsWith('vak:') && p.startsWith('vak:'))) app.panelT = 0;
+    // paneel aan de kant tegenover het object
+    let side = 'left';
+    if (p === 'phone' || p === 'prices' || p === 'staff' || p === 'invest') side = 'right';
+    if (p === 'invest' && app.s) app.s.flags.investSeenLvl = Math.max(app.s.flags.investSeenLvl || 0, app.s.level);
+    if (p === 'staff' && app.s) app.s.flags.staffSeen = true;
+    if (p.startsWith('vak:')) { const f = CC.FURNITURE.find(ff => ff.vakken && ff.vakken.includes(p.slice(4))); if (f && f.o === 'left') side = 'right'; }
+    if (app.panel && app.panelSide !== side) app.panelT = 0;
+    app.panel = p; app.panelVak = vak || null; app.panelSide = side;
+  };
+  app.closePanel = function () { app.panel = null; };
+  // Middenvenster openen op één wijn (avondinzicht, besluit 75)
+  app.focusWine = function (tab, wine) {
+    app.openPanel(tab === 'prices' ? 'prices' : 'phone');
+    app.assortFocus = wine ? { wine, t0: app.t } : null;
+  };
+  app.buy = function (id, n) { const r = SIM.buy(app.s, id, n); if (r.ok) { app.s.flags.bought = true; app.save(); } };
+  // Vaste bestelling (besluit 57): doel omhoog = direct bijbestellen; elke ochtend vult Ronnie aan.
+  app.setTarget = function (id, n) {
+    SIM.setTarget(app.s, id, n);
+    app.s.flags.bought = true;
+    if (SIM.vakOfWine(app.s, id)) app.s.flags.shelved = true;
+    app.save();
+  };
+  app.assign = function (vak, id, wineId) {
+    if (!vak && wineId) { const cur = SIM.vakOfWine(app.s, wineId); if (cur) SIM.assignVak(app.s, cur, null); }
+    else SIM.assignVak(app.s, vak, id);
+    if (id) app.s.flags.shelved = true; app.save();
+  };
+  // Ochtendbestelling plaatsen (knop "Bestellen" in het middenvenster)
+  app.placeOrder = function () {
+    const r = SIM.placeOrder(app.s, app.order || {});
+    if (!r.deliveries.length) return;
+    app.delivery = r; app.ordered = true;
+    app.order = SIM.orderProposal(app.s);
+    app.s.flags.bought = true; if (SIM.listed(app.s).length) app.s.flags.shelved = true;
+    if (CC.FX) CC.FX.sparkle(app.mouse.x, app.mouse.y, P.gold2, 10);
+    app.save();
+  };
+  // Personeel
+  app.staffOpen = function () { return app.s && (app.s.level >= Math.min(...Object.values(CC.STAFF).map(x => x.minLevel)) || SIM.staffCount(app.s) > 0); };
+  app.hire = function (id) { const r = SIM.hire(app.s, id); if (r.ok) app.save(); return r; };
+  app.fire = function (id) { if (SIM.fire(app.s, id)) app.save(); };
+  // Investeringen (besluit 60)
+  app.investOpen = function () { return app.s && CC.UPGRADES.some(u => SIM.upgradeUnlocked(app.s, u.id)); };
+  app.investNew = function () { const s = app.s; return CC.UPGRADES.some(u => SIM.upgradeUnlocked(s, u.id) && !SIM.owns(s, u.id) && u.lvl > (s.flags.investSeenLvl || 0)); };
+  app.buyUpgrade = function (id) {
+    const r = SIM.buyUpgrade(app.s, id);
+    if (!r.ok) return r;
+    const u = CC.upgradeById(id);
+    if (id === 'kast3' || id === 'kast4') app.rebuildRoom();
+    if (CC.FX) {
+      CC.FX.sparkle(app.mouse.x, app.mouse.y, P.gold2, 10);
+      // en een vonkenregen op de plek in de winkel zelf
+      setTimeout(() => {
+        let at = null;
+        if (id === 'uithangbord' && CC.BG) at = { x: CC.BG.sign.x + 36, y: CC.BG.sign.y + 16 };
+        const sh = (app.worldRects.shelves || []).find(x => CC.FURNITURE.find(f => f.id === x.id && f.upgrade === id));
+        if (sh && sh.rects.length) { const r = sh.rects[0]; at = { x: r.x + r.w / 2, y: r.y + 10 }; }
+        if (at) CC.FX.burst(at.x, at.y, P.gold);
+      }, 60);
+    }
+    app.save(); return r;
+  };
+  app.setVitrine = function (id) { SIM.setVitrine(app.s, id); app.save(); };
+  app.setPrice = function (id, st) { SIM.setPrice(app.s, id, st); app.s.flags.priced = true; app.save(); };
+  app.closeNotice = function () {
+    if (!app.notice) return;
+    if (!app.notice.wine) { if (app.notice.flag) app.s.flags[app.notice.flag] = true; app.notice = app.notice.next || null; app.save(); return; }
+    app.s.flags.scarceSeen = (app.s.flags.scarceSeen || []).concat([app.notice.wine]);
+    app.notice = null; app.save();
+    const seen = app.s.flags.scarceSeen, sc = SIM.unlockedWines(app.s).find(w => CC.roleById(w.role).scarce && !seen.includes(w.id));
+    if (sc) app.notice = { wine: sc.id };
+  };
+  app.openShop = function () {
+    if (app.phase !== 'prep') return;
+    if (app.notice) return;
+    if (!SIM.listed(app.s).some(l => l.n > 0) && !app.emptyWarn) { app.emptyWarn = true; return; }   // lege winkel: eerst waarschuwen
+    app.emptyWarn = false;
+    app.delivery = null;
+    if (app.s.mishap && !app.s.mishap.choice) return;   // eerst de tegenvaller afhandelen
+    app.panel = null; app.phase = 'sale'; app.speed = app.speed || 1; app.acc = 0;
+    app.s.flags.opened = true;
+    app.day = DAY.start(app.s);
+    app.day.visual = true;
+  };
+  app.setSpeed = function (n) { app.speed = n; };
+  // Advies: klik op een klant met ! → kaartje, spel pauzeert
+  app.openAdvice = function (c) {
+    if (app.phase !== 'sale' || app.advice || c.state !== 'ask') return;
+    app.advice = { c, stage: 'ask', t: 0 };
+    app.s.flags.advised = true;
+  };
+  app.answerAdvice = function (wineId) {
+    const A = app.advice;
+    if (!A || A.stage !== 'ask' || A.c.state !== 'ask') return;
+    A.res = DAY.answer(app.day, app.s, A.c, wineId);
+    A.stage = 'result'; A.t = 0;
+  };
+  app.closeAdvice = function () { app.advice = null; };
+  app.skipDay = function () { if (app.phase === 'sale' && !app.advice) { app.day.visual = false; DAY.finish(app.day, app.s); } };
+  function endDay() {
+    app.advice = null;
+    app.summary = SIM.endDay(app.s, app.day.log);
+    app.s.resultOpen = true;   // herladen op de bon = dezelfde bon, geen herhaling van de dag
+    app.phase = 'result'; app.resultT = 0;
+    const T = CC.TEXT.result;
+    app.resultQuip = CC.pickText(app.summary.margin > 60 ? T.goodDay : T.badDay);
+    app.save();
+  }
+  app.afterResult = function () {
+    if (app.resultT < 1.25) { app.resultT = 1.25; return; }   // eerste klik: telling direct afmaken
+    app.staffUps = (app.summary && app.summary.staffUp || []).slice();
+    if (app.summary && app.summary.levelUp) {
+      app.levelQuip = CC.pickText(CC.TEXT.levelUp);
+      app.rebuildRoom();
+      return app.setPhase('levelup');
+    }
+    app.afterLevel();
+  };
+  app.afterLevel = function () {
+    if (app.staffUps && app.staffUps.length) return app.setPhase('staffup');
+    app.s.resultOpen = false;
+    const r = SIM.advanceDay(app.s);
+    app.save();
+    if (r === 'sunday') app.openSunday(); else app.startPrep();
+  };
+
+  app.afterStaffUp = function () { app.staffUps.shift(); app.afterLevel(); };
+
+  // ---------- Zondag: de bank ----------
+  const money = v => R.euro(v);
+  // app.sunday is hetzelfde object als s.sun, zodat bank- en kaartstand mee opgeslagen worden.
+  app.setSunday = function (o) { app.s.sun = o; app.sunday = o; };
+  app.openSunday = function () {
+    const s = app.s, B = CC.TEXT.bank, C = CC.CONFIG;
+    app.setPhase('sunday');
+    if (s.sun && s.sun.week === s.week) {   // hervatten: dezelfde zondag, zelfde kaarten
+      app.sunday = s.sun; s.sun.t0 = app.t; s.sun.chosenT = s.sun.chosen ? app.t - 10 : null;
+      if (s.sun.stage === 'ask' && SIM.bankDone(s)) Object.assign(s.sun, { stage: 'done', mood: 'happy', text: CC.pickText(CC.TEXT.bank.paid) });
+      if (s.sun.stage === 'done' && !s.sun.cards) app.offerCards();
+      return;
+    }
+    if (!SIM.inLoan(s)) { app.setSunday({ week: s.week, stage: 'done', mood: 'happy', text: B.endless, due: 0 }); app.offerCards(); app.save(); return; }
+    const due = SIM.weekDue(s), cash = s.cash;
+    const canPay = cash >= due, canPostpone = !s.postponed && s.week < C.repay.length;
+    let text, mood;
+    if (canPay && cash - due >= due * 0.5) { text = s.week === 1 ? B.firstWeek.split('{due}').join(money(due)).split('{next}').join(money(C.repay[1])).split('{last}').join(money(C.repay[C.repay.length - 1])) : s.week === C.repay.length ? B.lastWeek.split('{due}').join(money(due)) : CC.pickText(B.ok, null, { due: money(due) }); mood = 'neutral'; }
+    else if (canPay) { text = CC.pickText(B.tight, null, { due: money(due), left: money(cash - due) }); mood = 'neutral'; }
+    else {
+      text = CC.pickText(B.short, null, { due: money(due), cash: money(Math.max(0, cash)), short: money(due - cash) }) + ' ' +
+        (canPostpone ? CC.pickText(B.postponeOffer, null, { fine: money(C.postponeFine) }) : CC.pickText(B.noMore));
+      mood = 'grim';
+    }
+    app.setSunday({ week: s.week, stage: 'ask', mood, text, due, canPay, canPostpone });
+    app.ring = { t0: app.t };   // eerst gaat de telefoon op de toonbank (M7-juice); klik of Enter slaat over
+    app.save();
+  };
+  app.ringDur = 1.6;
+  app.ringing = function () { if (app.ring && app.t - app.ring.t0 >= app.ringDur) app.ring = null; return !!app.ring; };
+  app.bankPay = function () {
+    const r = SIM.payWeek(app.s);
+    if (!r.ok) return;
+    app.save();
+    if (r.won) return app.setPhase('won');
+    app.setSunday(Object.assign({}, app.sunday, { stage: 'done', mood: 'happy', text: CC.pickText(CC.TEXT.bank.paid) }));
+    app.offerCards();
+  };
+  // Weekkaarten: na de bank kies je 1 van 2 kaarten voor volgende week
+  app.offerCards = function () {
+    const s = app.s;
+    if (s.status !== 'playing' && s.status !== 'endless') return;
+    if (app.sunday.cards) return;   // al aangeboden (bijv. na herladen)
+    app.sunday.cards = SIM.offerCards(s, CC.makeRng(s));
+    app.sunday.chosen = null; app.sunday.cardMsg = null; app.sunday.t0 = app.t; app.sunday.chosenT = null;
+    app.save();
+  };
+  app.chooseCard = function (id) {
+    const sun = app.sunday; if (!sun || sun.chosen) return;
+    const r = SIM.chooseCard(app.s, id, CC.makeRng(app.s));
+    if (!r.ok) return;
+    sun.chosen = id; sun.chosenT = app.t;
+    if (r.box) sun.cardMsg = CC.TEXT.cardUi.boxResult.split('{wine}').join(CC.wineById(r.box).name).split('{worth}').join(R.euro(r.worth));
+    app.save();
+  };
+  // Tegenvaller op maandag
+  app.decideMishap = function (choice) {
+    const s = app.s; if (!s.mishap || s.mishap.choice) return;
+    const r = SIM.decideMishap(s, choice, CC.makeRng(s));
+    if (!r.ok) return;
+    if (r.lost != null) app.mishapMsg = r.lost ? CC.TEXT.cardUi.gambleLose : CC.TEXT.cardUi.gambleWin;
+    app.save();
+  };
+  app.bankPostpone = function () {
+    const r = SIM.postpone(app.s);
+    if (!r.ok) return;
+    app.save();
+    app.setSunday(Object.assign({}, app.sunday, { stage: 'done', mood: 'neutral', text: CC.pickText(CC.TEXT.bank.postponed, null, { next: money(r.next) }) }));
+    app.offerCards();
+  };
+  app.canAffordCard = function () { const sun = app.sunday; return !!(sun && sun.cards && sun.cards.some(id => { const c = CC.cardById(id); return !c.cost || app.s.cash >= c.cost; })); };
+  app.bankBankrupt = function () { SIM.bankrupt(app.s); app.bankQuote = CC.pickText(CC.TEXT.bank.bankrupt); app.save(); app.setPhase('gameover'); };
+  app.bankNextWeek = function () {
+    // eerst een kaart kiezen, behalve als je geen van beide kunt betalen (anders zit je vast)
+    if (app.sunday && app.sunday.cards && !app.sunday.chosen && app.canAffordCard()) return;
+    SIM.startWeek(app.s); app.sunday = null; app.mishapMsg = null; app.startPrep();   // startWeek wist ook s.sun
+  };
+  app.hintText = function () {
+    const s = app.s, f = s.flags;
+    if (!f.bought) return 'Welkom in je eigen wijnhandel. Kijk linksboven wie er vandaag komt, en klik dan op de telefoon om wijn te bestellen bij Ronnie.';
+    if (!f.shelved) return 'Klik op een kast en zet er een wijn in. Het schap vult zich vanzelf uit je magazijn.';
+    if (!f.opened) return 'Elke ochtend zet Ronnie een bestelling klaar; jij beslist of die doorgaat. Prijzen zet je bij de kassa. Klaar? Open de winkel.';
+    if (!SIM.listed(s).some(l => l.n > 0)) return CC.TEXT.hint.emptyShop;
+    if (app.investNew()) { const u = CC.UPGRADES.filter(x => SIM.upgradeUnlocked(s, x.id) && !SIM.owns(s, x.id)).pop(); return CC.TEXT.invest.newHint.split('{name}').join(u.name.toLowerCase()).split('{cost}').join(R.euro(u.cost)); }
+    if (app.staffOpen() && !f.staffSeen) return 'Je kunt nu personeel aannemen. Klik op "Personeel" (toets P).';
+    // bestelling van Ronnie staat nog klaar
+    if (!app.ordered && app.order && Object.values(app.order).some(n => n > 0)) {
+      const n = Object.values(app.order).reduce((a, b) => a + b, 0);
+      return CC.TEXT.order.pending.split('{n}').join(n).split('{cost}').join(R.euro(SIM.orderCost(s, app.order)));
+    }
+    return null;
+  };
+
+  // Dag/nacht is geschrapt (besluit 56): altijd schemer.
+
+  // ---------- Tekenen ----------
+  function painted() { const b = app.images.bg; return !!(CC.BG && b && b.complete && b.naturalWidth); }
+  function drawWorld(dt) {
+    const s = app.s || CC.newState(1);
+    const hover = app.hoverId || '';
+    const PAINT = painted();
+    if (PAINT) { R.drawLayer(ctx, app.images, 'bg', { x: 0, y: 0 }); R.paintedSign(ctx, app.images, app.s && SIM.owns(app.s, 'uithangbord') ? app.t : null); if (CC.FX) CC.FX.ambience(ctx, app.t, dt); }
+    else {
+      if (!R.roomCache || app.roomLevel !== (app.s ? app.s.level : 1)) app.rebuildRoom();
+      ctx.drawImage(R.roomCache, 0, 0);
+    }
+    // wandobjecten
+    // meubels + klanten, gesorteerd op diepte
+    const items = [];
+    for (const f of SIM.activeFurniture(s)) items.push({ depth: f.x + f.w / 2 + f.y + f.d / 2, f });
+    if (app.day) for (const c of app.day.customers) items.push({ depth: c.x + c.y, c });
+    // personeel: tijdens de dag de levende figuurtjes, anders op hun vaste plek
+    // personeel: tijdens de dag de levende figuurtjes; daarbuiten slenteren ze rond hun vaste plek
+    let staff = app.day ? app.day.staff : null;
+    if (!staff && app.s) {
+      const key = Object.keys(app.s.staff || {}).sort().join(',');
+      if (!app.idleStaff || app.idleKey !== key) { app.idleStaff = CC.DAY.staffAgents(app.s); app.idleKey = key; }
+      if (app.phase === 'prep') for (const a of app.idleStaff) CC.DAY.idleStep(a, dt);
+      staff = app.idleStaff;
+    }
+    for (const a of staff || []) items.push({ depth: a.x + a.y, c: a });
+    // buiten: voorbijgangers; als de winkel dicht is ook kat en muis, te laat, dutje (M7b)
+    if (CC.FX && PAINT) for (const it of CC.FX.street(dt, app.phase)) items.push(it);
+    items.sort((a, b) => a.depth - b.depth);
+    const shelves = [];
+    const heads = [];
+    const asks = [];
+    let shelfN = 0;
+    for (const it of items) {
+      if (it.f) {
+        const f = it.f;
+        if (f.kind === 'shelf') {
+          shelfN++;
+          const hv = hover.startsWith('w_vak') ? hover.slice(2) : null;
+          const rects = PAINT ? R.paintedShelf(ctx, f, s, hv, app.images) : R.drawShelf(ctx, f, s, hv);
+          shelves.push({ id: f.id, name: 'Schap ' + (CC.FURNITURE.filter(ff => ff.kind === 'shelf').indexOf(f) + 1), rects });
+        } else if (f.kind === 'counter') app.worldRects.counter = R.drawCounter(ctx, f, hover === 'w_counter');
+        else if (f.kind === 'counterFront' && PAINT) { app.worldRects.counter = CC.BG.register; app.worldRects.phone = CC.BG.phone; }
+        else if (PAINT && (f.kind === 'barrel' || f.kind === 'crates' || f.kind === 'plant')) { /* geschilderd */ }
+        else if (f.kind === 'table' && PAINT) R.paintedTable(ctx, f, s, app.images);
+        else if (f.kind === 'decor') { if (PAINT) R.paintedDecor(ctx, f, app.images, app.t); }
+        else if (f.kind === 'counterFront') { const r = R.drawCounterFront(ctx, f, hover === 'w_counter' ? 'register' : (hover === 'w_phone' ? 'phone' : null)); app.worldRects.counter = r.register; app.worldRects.phone = r.phone; }
+        else if (f.kind === 'crates') R.drawCrates(ctx, f);
+        else if (f.kind === 'plant') R.drawPlant(ctx, f, app.t);
+        else if (f.kind === 'barrel') R.drawBarrel(ctx, f);
+        else if (f.kind === 'table') app.worldRects.table = R.drawTable(ctx, f, s, hover === 'w_table');
+        else if (f.kind === 'chalkboard') R.drawChalkboard(ctx, f);
+        else if (f.kind === 'umbrellas') R.drawUmbrellas(ctx, f);
+      } else if (it.critter) {
+        CC.FX.drawCritter(ctx, it.critter);
+      } else {
+        const head = R.drawCustomerSprite(ctx, it.c, app.images) || R.drawCustomer(ctx, it.c, app.t);
+        if (it.c.bubble) heads.push({ head, b: it.c.bubble });
+        if (it.c.state === 'ask') asks.push({ head, c: it.c });
+      }
+    }
+    app.worldRects.shelves = shelves;
+    if (PAINT) { if (hover === 'w_counter') R.hoverBox(ctx, CC.BG.register); if (hover === 'w_phone') R.hoverBox(ctx, CC.BG.phone); }
+    if (PAINT && hover === 'w_vitrine' && CC.BG_LAYERS && app.images.layer_table) { const TL = CC.BG_LAYERS.table, im = app.images.layer_table; R.hoverBox(ctx, { x: TL.x + 6, y: TL.y, w: im.naturalWidth - 12, h: Math.round(im.naturalHeight * 0.6) }); }
+    // tekstballonnen en zwevende bedragen boven alles
+    const placed = asks.map(a => ({ x: a.head[0] - 9, y: a.head[1] - 30, w: 19, h: 28 }));   // ballonnen niet over een !
+    heads.sort((a, b) => a.head[1] - b.head[1]);
+    if (!app.advice) for (const h of heads) R.bubble(ctx, h.head[0], h.head[1] - 1, h.b.text, h.b.tone, Math.min(1, h.b.t * 3), placed);   // niet boven het adviesvenster uit
+    // adviesvragen: ! boven het hoofd, klik op de klant
+    for (const a of asks) {
+      const frac = Math.max(0, a.c.patience / CC.CONFIG.advicePatience);
+      const m = R.askMark(ctx, a.head[0], a.head[1], app.t, frac);
+      if (app.phase === 'sale' && !app.advice) UI.hit(app, 'ask_' + a.c.id, m.x - 4, m.y, m.w + 8, a.head[1] - m.y + 60, () => app.openAdvice(a.c), 'Klant heeft een vraag');
+    }
+    if (app.day) for (const f of app.day.floats) {
+      if (f.cash) { UI.cashFloat(app, ctx, f); continue; }
+      const [sx, sy] = R.iso(f.x, f.y);
+      const rise = Math.round((1.2 - f.t) * 14);
+      // leesbaar: donkere rand rondom, kleine sprong aan het begin
+      const hop = f.t > 1.0 ? Math.round((f.t - 1.0) * 10) : 0, yy = sy - rise - hop - (f.lift || 0);
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]]) CC.FONT.draw(ctx, f.text, sx + dx, yy + dy, P.ink, { align: 'center' });
+      CC.FONT.draw(ctx, f.text, sx, yy, f.col, { align: 'center' });
+    }
+    // tutorialpijl
+    if (app.phase === 'prep' && !app.panel) {
+      const f = s.flags;
+      if (!f.bought && app.worldRects.phone) { const r = app.worldRects.phone; R.arrow(ctx, r.x + 8, r.y, app.t); }
+      else if (!f.shelved && shelves[0]) { const r = shelves[0].rects[0]; R.arrow(ctx, r.x + r.w / 2, r.y - 4, app.t); }
+      else if (!f.opened) R.arrow(ctx, 580, 332, app.t);
+    }
+  }
+
+  function frame(dt) {
+    app.t += dt;
+    DBG.tick(dt);
+    // klik verwerken met de klikvlakken van de vorige frame
+    if (app.click) {
+      const h = UI.pick(app.click.x, app.click.y);
+      if (h && h.onClick) h.onClick();
+      else if (!h && app.panel && app.phase === 'prep') app.closePanel();
+      app.click = null;
+    }
+    // simulatie
+    if (app.advice) app.advice.t += dt;
+    if (app.phase === 'sale' && app.advice) { /* pauze: het kaartje is open */ }
+    else if (app.phase === 'sale') {
+      app.day.speed = app.speed;
+      app.acc += Math.min(dt, 0.1) * app.speed;
+      let n = 0;
+      while (app.acc >= DAY.STEP && !app.day.done && n++ < 40) { DAY.step(app.day, app.s, DAY.STEP); app.acc -= DAY.STEP; }
+      if (app.day.done) endDay();
+    }
+    if (app.panel) app.panelT += dt;
+    if (app.phase === 'result') app.resultT += dt;
+    app.phaseT += dt;
+
+    // tekenen
+    UI.hits = [];
+    ctx.imageSmoothingEnabled = false;
+    drawWorld(dt);
+    if (app.phase === 'title') { UI.title(app, ctx); }
+    else {
+      UI.worldHits(app);
+      UI.hud(app, ctx);
+      if (app.phase === 'prep' || app.phase === 'sale') UI.weekChips(app, ctx);
+      if (app.phase === 'prep') {
+        UI.prepBar(app, ctx);
+        if (app.panel === 'lastday') UI.lastDayPanel(app, ctx);
+        else if (app.panel === 'staff') UI.staffPanel(app, ctx);
+        else if (app.panel === 'invest') UI.investPanel(app, ctx);
+        if ((app.panelSide === 'right' || !app.panel) && !(app.s.mishap && (!app.s.mishap.choice || app.mishapMsg))) UI.forecastBoard(app, ctx);
+        if (app.panel === 'assort') UI.assortPanel(app, ctx);
+        if (app.s.mishap && (!app.s.mishap.choice || app.mishapMsg)) UI.mishapPanel(app, ctx);
+        else if (app.notice) UI.noticePanel(app, ctx);
+      }
+      if (app.phase === 'sale') { UI.saleBar(app, ctx); UI.saleHint(app, ctx); if (app.advice) UI.advicePanel(app, ctx); }
+      if (app.phase === 'result') UI.resultPanel(app, ctx);
+      if (app.phase === 'levelup') UI.levelPanel(app, ctx);
+      if (app.phase === 'staffup') UI.staffUpPanel(app, ctx);
+      if (app.phase === 'sunday') UI.sundayPanel(app, ctx);
+      if (app.phase === 'gameover') UI.endPanel(app, ctx, false);
+      if (app.phase === 'won') UI.endPanel(app, ctx, true);
+    }
+    if (CC.FX) CC.FX.drawParts(ctx, dt);   // deeltjes boven alles (muntjes, deurbel, vuurwerk)
+    DBG.draw(app, ctx);
+    const h = UI.pick(app.mouse.x, app.mouse.y);
+    app.hoverId = h ? h.id : null;
+    canvas.style.cursor = h && h.onClick ? 'pointer' : 'default';
+    UI.tooltip(app, ctx);
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    frame(dt);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();

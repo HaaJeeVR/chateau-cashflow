@@ -1,0 +1,11 @@
+# Grote bronbestanden en werkmappen die niet in de repo horen
+art_bronnen/
+chatgpt site/
+Claude outputs/
+_archief/
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+Thumbs.db
+desktop.ini

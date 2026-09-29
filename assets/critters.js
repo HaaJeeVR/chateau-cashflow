@@ -1,0 +1,2 @@
+// gegenereerd door tools/build_critters.py
+(window.CC = window.CC || {}).CRITTERS = {"cat_run1": {"src": "assets/critter_cat_run1.png", "w": 36, "h": 21}, "cat_run2": {"src": "assets/critter_cat_run2.png", "w": 33, "h": 22}, "cat_walk": {"src": "assets/critter_cat_walk.png", "w": 32, "h": 24}, "cat_sit": {"src": "assets/critter_cat_sit.png", "w": 24, "h": 25}, "mouse_run1": {"src": "assets/critter_mouse_run1.png", "w": 28, "h": 12}, "mouse_run2": {"src": "assets/critter_mouse_run2.png", "w": 26, "h": 13}};
