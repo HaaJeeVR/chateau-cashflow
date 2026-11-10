@@ -37,6 +37,8 @@
   if (CC.ICONS) for (const k in CC.ICONS) loadImg('icon_' + k, CC.ICONS[k].src);
   if (CC.DECOR_TILES) for (const lv in CC.DECOR_TILES) loadImg('tile_decor' + lv, CC.DECOR_TILES[lv]);
   if (CC.INTRO_ART) for (const k in CC.INTRO_ART) loadImg('intro_' + k, CC.INTRO_ART[k].src);
+  // Eindbeeld failliet (B3): bestaat assets/rolluik.png, dan vervangt hij vanzelf het getekende rolluik (besluit 94).
+  { const rl = new Image(); rl.onerror = () => { app.images.rolluik = null; }; rl.src = 'assets/rolluik.png'; app.images.rolluik = rl; }
   CC.IMAGES = app.images;
   const logoSign = new Image(); logoSign.onload = () => { R.roomCache = null; }; logoSign.src = 'assets/logo_sign.png'; app.images.logoSign = logoSign;
 

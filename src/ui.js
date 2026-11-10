@@ -1530,13 +1530,45 @@
   };
 
   // ---------- Einde: failliet of schuldenvrij ----------
+  // Rolluik (besluit 94): zakt over de winkel, veert even na. Met assets/rolluik.png (640 × 343, B3) wordt dat
+  // plaatje gebruikt en op dezelfde manier naar beneden geschoven; anders tekent de code het.
+  UI.shutter = function (app, ctx, t) {
+    const DUR = 1.25, top = 17, full = 343;
+    const k = Math.min(1, t / DUR), ease = 1 - Math.pow(1 - k, 3);
+    const bounce = t > DUR && t < DUR + 0.35 ? Math.round(Math.sin((t - DUR) / 0.35 * Math.PI) * 3) : 0;
+    const hgt = Math.max(0, Math.round(full * ease) - bounce);
+    const img = app.images.rolluik;
+    if (img && img.complete && img.naturalWidth) {
+      ctx.drawImage(img, 0, img.naturalHeight - hgt, img.naturalWidth, hgt, 0, top, img.naturalWidth, hgt);
+      return k >= 1;
+    }
+    // lamellen vanaf de onderlijst omhoog (ze bewegen mee): drie tinten metaal, naad om de 6 px,
+    // elke 7e lamel een rij ventilatiegleufjes
+    const y0 = top + 10, by = top + hgt - 6;
+    if (hgt > 0 && hgt < full) R().rect(ctx, 0, by + 6, 640, 3, 'rgba(31,10,14,0.4)');   // schaduw onder de lijst
+    for (let i = 0, yy = by - 6; yy + 6 > y0; i++, yy -= 6) {
+      const a = Math.max(yy, y0);
+      R().rect(ctx, 0, a, 640, yy + 6 - a, P.stone1);
+      if (yy >= y0) R().rect(ctx, 0, yy, 640, 1, '#a39a8c');
+      if (yy + 2 >= y0) R().rect(ctx, 0, yy + 2, 640, 1, '#8a8176');
+      R().rect(ctx, 0, yy + 5, 640, 1, '#4a443e');
+      if (i % 7 === 3 && yy + 3 >= y0) for (let x = 14; x < 640; x += 22) R().rect(ctx, x, yy + 3, 8, 1, '#3a342f');
+    }
+    // onderlijst met twee handgrepen
+    if (by + 6 > y0) {
+      R().rect(ctx, 0, by, 640, 6, '#4a443e'); R().rect(ctx, 0, by, 640, 1, '#a39a8c'); R().rect(ctx, 0, by + 5, 640, 1, P.ink);
+      for (const hx of [200, 424]) { R().rect(ctx, hx, by + 2, 16, 3, P.ink); R().rect(ctx, hx + 1, by + 2, 14, 1, '#a39a8c'); }
+    }
+    // kast bovenin waar het rolluik uit komt
+    R().rect(ctx, 0, top, 640, 10, '#4a443e'); R().rect(ctx, 0, top + 1, 640, 1, '#6b6259'); R().rect(ctx, 0, top + 9, 640, 1, P.ink);
+    for (let x = 10; x < 640; x += 90) R().rect(ctx, x, top + 4, 2, 2, '#a39a8c');   // klinknagels
+    return k >= 1;
+  };
+
   UI.endPanel = function (app, ctx, won) {
     const s = app.s, t = app.phaseT;
     if (!won) {
-      // rolluik zakt naar beneden
-      const drop = Math.min(1, t / 1.2), hgt = Math.round(343 * (1 - Math.pow(1 - drop, 3)));
-      for (let yy = 17; yy < 17 + hgt; yy += 6) { R().rect(ctx, 0, yy, 640, 5, '#6b6259'); R().rect(ctx, 0, yy, 640, 1, '#8a8176'); R().rect(ctx, 0, yy + 5, 640, 1, '#3a342f'); }
-      if (drop < 1) return;
+      if (!UI.shutter(app, ctx, t)) return;
       UI.hit(app, 'end_block', 0, 17, 640, 343, () => {}, null);
       // failliet-scherm met "wat ging er mis" (besluit 77)
       const W = 380, H = 236, X = 130, Y = 62;
@@ -1563,17 +1595,64 @@
       F().draw(ctx, `Week ${s.week} · niveau ${s.level} · ${s.totals.bottles} flessen verkocht · afgelost ${R().euro(s.debtPaid)}`, 320, Y + H - 44, P.stone2, { align: 'center' });
       UI.btn(app, ctx, 'restart', 320 - 70, Y + H - 30, 140, 22, 'Opnieuw beginnen', () => app.restart(), { tone: 'bord' });
     } else {
-      UI.dim(app, ctx, 0.5);
-      for (let i = 0; i < 60; i++) { const px = (i * 97 + Math.floor(t * 40) * (i % 3 + 1)) % 640, py = (i * 53 + Math.floor(t * 60 * (1 + (i % 4) * 0.3))) % 343 + 17; R().rect(ctx, px, py, 3, 2, [P.gold, P.bord4, P.green4, P.cream3][i % 4]); }
-      R().panel(ctx, 170, 80, 300, 190);
-      UI.ornateTitle(ctx, 'SCHULDENVRIJ!', 320, 98, P.bord2, { shadow: P.gold });
-      const wl = F().wrap(CC.TEXT.bank.won, 260);
-      wl.forEach((l, i) => F().draw(ctx, l, 320, 118 + i * 10, P.ink, { align: 'center' }));
-      let yy = 124 + wl.length * 10 + 8;
-      const row = (l, r) => { F().draw(ctx, l, 200, yy, P.ink); F().draw(ctx, r, 440, yy, P.ink, { align: 'right' }); yy += 12; };
-      row('Kas', R().euro(s.cash)); row('Niveau', String(s.level)); row('Flessen verkocht', String(s.totals.bottles)); row('Totale omzet', R().euro(s.totals.revenue));
-      UI.btn(app, ctx, 'endless', 250, 238, 140, 22, 'Verder spelen ▶', () => app.bankNextWeek(), { tone: 'bord' });
+      UI.wonPanel(app, ctx, t);
     }
+  };
+
+  // Score bij schuldenvrij (besluit 94): alleen voor het eindscherm, niets in de sim.
+  // 1 punt per €10 kas · 100 per niveau · 1 per verkochte fles · 50 per gehaalde klus · 250 als je geen uitstel nodig had.
+  UI.finalScore = function (s) {
+    let klus = 0;
+    for (let L = 1; L <= s.level; L++) if (CC.SIM.klusDef(L)) klus++;
+    klus = Math.max(0, klus - CC.SIM.klusOpen(s).length);
+    const rows = [
+      { l: 'Kas', d: R().euro(s.cash), p: Math.max(0, Math.floor(s.cash / 10)) },
+      { l: 'Niveau', d: String(s.level), p: s.level * 100 },
+      { l: 'Flessen verkocht', d: String(s.totals.bottles), p: s.totals.bottles },
+      { l: 'Klussen gehaald', d: String(klus), p: klus * 50 },
+      { l: 'Zonder uitstel', d: s.postponed ? 'nee' : 'ja', p: s.postponed ? 0 : 250 },
+    ];
+    return { rows, total: rows.reduce((a, r) => a + r.p, 0) };
+  };
+  UI.wonPanel = function (app, ctx, t) {
+    const s = app.s;
+    UI.dim(app, ctx, 0.55);
+    const w = 400, h = 284, x = 120, y = 36;
+    UI.rays(ctx, 320, y + 30, 320, app.t, 0.15 * Math.min(1, t / 0.5));
+    UI.celebrate(app, x + 10, x + w - 10, y - 10);
+    const pop = Math.min(1, t / 0.25), yy0 = y + Math.round((1 - pop) * 24);
+    UI.hit(app, 'won_block', x, yy0, w, h, () => {}, null);
+    R().panel(ctx, x, yy0, w, h);
+    UI.ornateTitle(ctx, 'SCHULDENVRIJ!', 320, yy0 + 17, P.bord2, { shadow: P.gold, len: 52 });
+    // de bankier, blij, met zijn slotzin
+    UI.portrait(app, ctx, 'bankier', 'happy', x + 22, yy0 + 34, 80);   // ware grootte (80 × 80)
+    const ql = F().wrap('"' + CC.TEXT.bank.won + '"', w - 136);
+    ql.slice(0, 4).forEach((l, i) => F().draw(ctx, l, x + 116, yy0 + 50 + i * 10, P.ink));
+    F().draw(ctx, '- ' + CC.TEXT.bank.name, x + 116, yy0 + 56 + Math.min(4, ql.length) * 10, P.stone1);
+    // score als bonnetje: regels lopen één voor één op, dan het totaal
+    const sc = UI.finalScore(s);
+    const bx = x + 40, bw = w - 80, by = yy0 + 124, rowH = 13;
+    const bh = 20 + sc.rows.length * rowH + 26;
+    R().rect(ctx, bx + 2, by + 2, bw, bh, 'rgba(31,10,14,0.2)');
+    R().rect(ctx, bx - 1, by - 1, bw + 2, bh + 1, P.ink); R().rect(ctx, bx, by, bw, bh, P.cream3);
+    for (let i = 0; i < bw; i += 6) { R().rect(ctx, bx + i, by + bh, 3, 2, P.cream3); R().rect(ctx, bx + i + 3, by + bh, 3, 1, P.ink); }
+    HF().draw(ctx, 'SCORE', bx + bw / 2, by + 5, P.ink, { align: 'center' });
+    let ry = by + 21;
+    sc.rows.forEach((r, i) => {
+      const k = Math.max(0, Math.min(1, (t - 0.6 - i * 0.3) / 0.45));
+      if (k <= 0) { ry += rowH; return; }
+      F().draw(ctx, r.l, bx + 9, ry, P.ink);
+      F().draw(ctx, r.d, bx + 130, ry, P.wood2, { align: 'right' });
+      F().draw(ctx, '+' + Math.round(r.p * k).toLocaleString('nl-NL'), bx + bw - 9, ry, r.p ? P.green2 : P.stone2, { align: 'right' });
+      ry += rowH;
+    });
+    for (let i = 8; i < bw - 8; i += 4) R().rect(ctx, bx + i, ry + 1, 2, 1, P.stone2);
+    const kt = Math.max(0, Math.min(1, (t - 0.6 - sc.rows.length * 0.3) / 0.8));
+    if (kt > 0) {
+      F().draw(ctx, 'Totaal', bx + 9, ry + 9, P.ink);
+      HF().draw(ctx, Math.round(sc.total * (1 - Math.pow(1 - kt, 2))).toLocaleString('nl-NL'), bx + bw - 9, ry + 6, P.bord2, { align: 'right' });
+    }
+    if (t > 0.6 + sc.rows.length * 0.3 + 0.6) UI.btn(app, ctx, 'endless', 320 - 70, yy0 + h - 30, 140, 20, 'Verder spelen ▶', () => app.bankNextWeek(), { tone: 'bord' });
   };
 
   // ---------- Titelscherm: sfeer ----------
