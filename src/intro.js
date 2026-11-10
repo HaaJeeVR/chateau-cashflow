@@ -158,7 +158,7 @@
     R().rect(g, x + 2, y + 3, w, h, 'rgba(14,12,24,0.5)');
     R().rect(g, x, y, w, h, ink);
     R().rect(g, x + 1, y + 1, w - 2, h - 2, red); R().rect(g, x + 2, y + 2, w - 4, 1, red2);
-    F().draw(g, TX().board, x + w / 2, y + 6, white, { align: 'center', scale: 2, shadow: '#5e1a24' });
+    F().head.draw(g, TX().board, x + w / 2, y + 8, white, { align: 'center', shadow: '#5e1a24' });
     R().rect(g, x + 4, y + 25, w - 8, 15, white);
     F().draw(g, TX().boardSub, x + w / 2, y + 29, '#6e1a26', { align: 'center' });
     for (const [tx, ty] of [[x - 3, y - 2], [x + w - 6, y - 2], [x - 3, y + h - 3], [x + w - 6, y + h - 3]]) R().rect(g, tx, ty, 9, 5, '#c9c3b2');   // plakband
@@ -219,10 +219,10 @@
   let STAMP = null;
   function stampImg() {   // GEHONOREERD met inktgaatjes (vast patroon)
     if (STAMP) return STAMP;
-    const L = TX().letter, sw = F().width(L.stamp, 2) + 16, sh = 26, c = canvas(sw, sh), g = c.getContext('2d');
+    const L = TX().letter, sw = F().head.width(L.stamp) + 18, sh = 26, c = canvas(sw, sh), g = c.getContext('2d');
     R().rect(g, 0, 0, sw, sh, P.bord3); g.clearRect(2, 2, sw - 4, sh - 4);
     R().rect(g, 3, 3, sw - 6, 1, P.bord3); R().rect(g, 3, sh - 4, sw - 6, 1, P.bord3);
-    F().draw(g, L.stamp, sw / 2, 6, P.bord3, { align: 'center', scale: 2 });
+    F().head.draw(g, L.stamp, sw / 2, 8, P.bord3, { align: 'center' });
     const d = g.getImageData(0, 0, sw, sh);   // alleen eigen tekenwerk: mag ook bij file://
     for (let i = 0; i < d.data.length; i += 4) { if (H((i >> 2) * 3.1 + 0.7) < 0.16) d.data[i + 3] = 0; else if (d.data[i + 3]) d.data[i + 3] = 215; }
     g.putImageData(d, 0, 0);

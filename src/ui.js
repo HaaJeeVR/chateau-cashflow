@@ -6,6 +6,7 @@
   const UI = {};
   const R = () => CC.R;
   const F = () => CC.FONT;
+  const HF = () => CC.FONT.head;   // kopfont (besluit 88): koppen en grote bedragen, nooit geschaald tekstfont
 
   // ---------- Klikvlakken ----------
   UI.hits = [];
@@ -56,6 +57,20 @@
     const rows = ['....#....', '...###...', '#########', '.#######.', '..#####..', '..##.##..', '.##...##.'];
     for (const [ox, oy, c] of [[1, 0, P.ink], [-1, 0, P.ink], [0, 1, P.ink], [0, -1, P.ink], [0, 0, col]])
       rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') R().rect(ctx, x + i + ox, y + j + oy, 1, 1, c); });
+  };
+
+  // Kop in het kopfont, met een gouden lijn en ruitje aan weerszijden (niveauscherm, eindschermen).
+  UI.ornateTitle = function (ctx, text, cx, y, col, opts) {
+    opts = opts || {};
+    const tw = HF().width(text), len = opts.len || 40, gap = opts.gap || 9, line = opts.line || P.gold;
+    if (opts.shadow) HF().draw(ctx, text, cx, y + 1, opts.shadow, { align: 'center' });
+    HF().draw(ctx, text, cx, y, col, { align: 'center' });
+    for (const side of [-1, 1]) {
+      const inner = Math.round(cx + side * (tw / 2 + gap)), outer = inner + side * len;
+      R().rect(ctx, Math.min(inner, outer), y + 5, len, 1, line);
+      R().rect(ctx, inner - 1, y + 4, 3, 3, line); R().rect(ctx, inner, y + 3, 1, 5, line);   // ruitje bij de tekst
+      R().rect(ctx, outer - (side > 0 ? 1 : 0), y + 4, 1, 3, line);                            // stipje aan het eind
+    }
   };
 
   // ---------- Volledig scherm (besluit 87) ----------
@@ -380,7 +395,7 @@
     if (sm.bought > 0 || !(sm.invest > 0)) row('Ingekocht', minus(sm.bought || 0), P.bord3);
     if (sm.invest > 0) row('Investering', minus(sm.invest), P.bord3);
     row('Kasstroom vandaag', signed(cf), cf >= 0 ? P.green2 : P.red, P.bord2);
-    const HH = { row: 10, dash: 5, big: 20, center: 11 };
+    const HH = { row: 10, dash: 5, big: 16, center: 11 };
     const bw = 204, bx = X + 12, by = y + 28;
     const bh = Math.max(30 + L.reduce((a, it) => a + HH[it.k], 0) + 26, H - 40);   // de bon loopt door tot onderaan, als een echte kassabon
     R().rect(ctx, bx + 2, by + 2, bw, bh, 'rgba(31,10,14,0.25)');
@@ -388,7 +403,8 @@
     R().rect(ctx, bx, by, bw, bh, P.cream3);
     for (let i = 0; i < bw; i += 6) { R().rect(ctx, bx + i, by + bh, 3, 2, P.cream3); R().rect(ctx, bx + i + 3, by + bh, 3, 1, P.ink); }
     let yy = by + 8;
-    F().draw(ctx, 'KASSABON', bx + bw / 2, yy, P.ink, { align: 'center', scale: 2 }); yy += 22;
+    HF().draw(ctx, 'KASSABON', bx + bw / 2, yy + 1, P.ink, { align: 'center' });
+    for (let i = 8; i < bw - 8; i += 2) R().rect(ctx, bx + i, yy + 15, 1, 1, P.stone2); yy += 20;   // bonnetjeslijn onder de kop
     for (const it of L) {
       if (it.k === 'dash') { for (let i = 8; i < bw - 8; i += 4) R().rect(ctx, bx + i, yy, 2, 1, P.stone2); yy += 5; }
       else if (it.k === 'row') {
@@ -401,7 +417,7 @@
         }
         F().draw(ctx, it.l, bx + 9, yy, it.lcol || P.ink); F().draw(ctx, it.r, bx + bw - 9, yy, it.col || P.ink, { align: 'right' }); yy += 10;
       }
-      else if (it.k === 'big') { F().draw(ctx, it.l, bx + 9, yy + 5, P.ink); F().draw(ctx, it.r, bx + bw - 9, yy, it.col, { align: 'right', scale: 2 }); yy += 20; }
+      else if (it.k === 'big') { F().draw(ctx, it.l, bx + 9, yy + 3, P.ink); HF().draw(ctx, it.r, bx + bw - 9, yy, it.col, { align: 'right' }); yy += 16; }
       else if (it.k === 'center') { F().draw(ctx, it.text, bx + bw / 2, yy, it.col, { align: 'center' }); yy += 11; }
     }
     for (let i = 8; i < bw - 8; i += 4) R().rect(ctx, bx + i, by + bh - 20, 2, 1, P.stone2);
@@ -410,7 +426,7 @@
     // ----- rechts: de winkel vandaag -----
     const rx = X + 232, rw = W - 244;
     let ry = y + 30;
-    const head = (txt) => { F().draw(ctx, txt, rx, ry, P.bord2); R().rect(ctx, rx, ry + 9, rw, 1, P.cream1); ry += 14; };
+    const head = (txt) => { HF().draw(ctx, txt, rx, ry - 2, P.bord2); R().rect(ctx, rx, ry + 10, rw, 1, P.cream1); ry += 14; };   // zelfde regelafstand als voorheen
     const line = (l, r, col, rcol) => { F().draw(ctx, l, rx, ry, col || P.ink); if (r) F().draw(ctx, r, rx + rw, ry, rcol || P.ink, { align: 'right' }); ry += 11; };
     // klanten: één balk met kopers en weglopers
     head('Klanten');
@@ -626,9 +642,7 @@
     UI.celebrate(app, x + 20, x + w - 20, y - 10);
     const pop = Math.min(1, t / 0.25), yy0 = y + Math.round((1 - pop) * 24);
     R().panel(ctx, x, yy0, w, h);
-    const title = `NIVEAU ${L}`;
-    F().draw(ctx, title, 320 + 1, yy0 + 16, P.gold, { align: 'center', scale: 3 });
-    F().draw(ctx, title, 320, yy0 + 15, P.bord2, { align: 'center', scale: 3 });
+    UI.ornateTitle(ctx, `NIVEAU ${L}`, 320, yy0 + 19, P.bord2, { shadow: P.gold, len: 48 });
     if (TX.theme) { const tw = F().width(TX.theme) + 20; R().pill(ctx, 320 - tw / 2, yy0 + 42, tw, 13, P.bord2, P.ink); F().draw(ctx, TX.theme, 320, yy0 + 45, P.cream3, { align: 'center' }); }
     F().draw(ctx, app.levelQuip, 320, yy0 + 60, P.stone1, { align: 'center' });
     const appear = i => Math.max(0, Math.min(1, (t - 0.35 - i * 0.18) / 0.22));
@@ -781,7 +795,7 @@
     if (sun.stage === 'done' && sun.cards) { UI.dim(app, ctx, 0.4); return UI.cardPick(app, ctx); }
     const x = 140, y = 42, w = 360, h = 262;
     R().panel(ctx, x, y, w, h);
-    F().draw(ctx, 'ZONDAG', x + w / 2, y + 12, P.bord2, { align: 'center', scale: 2 });
+    UI.ornateTitle(ctx, 'ZONDAG', x + w / 2, y + 14, P.bord2, { shadow: P.gold });
     // weekoverzicht
     const wk = s.history.filter(hh => hh.week === s.week);
     const sum = k => wk.reduce((a, b) => a + (b[k] || 0), 0);
@@ -794,7 +808,7 @@
     row('Reputatie', '+' + sum('rep'));
     row('Kas', R().euro(s.cash));
     // schuldmeter
-    if (s.status === 'endless') { F().draw(ctx, 'Lening afgelost', x + 190, y + 48, P.ink); F().draw(ctx, 'Schuldenvrij ★', x + 190, y + 62, P.green2, { scale: 2 }); }
+    if (s.status === 'endless') { F().draw(ctx, 'Lening afgelost', x + 190, y + 48, P.ink); HF().draw(ctx, 'Schuldenvrij ★', x + 190, y + 62, P.green2); }
     else {
     const total = CC.CONFIG.repay.reduce((a, b) => a + b, 0);
     const paid = Math.min(total, s.debtPaid);
@@ -997,7 +1011,7 @@
     R().panel(ctx, x, yy, w, h);
     if (UI.hasPortrait(app, up.id)) UI.portrait(app, ctx, up.id, 'happy', x + 16, yy + 18, 72);
     else UI.staffSprite(app, ctx, up.id, x + 24, yy + 16, 2);
-    F().draw(ctx, `LEVEL ${up.to}`, x + 100, yy + 22, P.bord2, { scale: 2 });
+    HF().draw(ctx, `LEVEL ${up.to}`, x + 100, yy + 24, P.bord2);
     F().draw(ctx, st.name + ' · ' + st.role.toLowerCase(), x + 100, yy + 44, P.stone1);
     const txt = CC.TEXT.staff.levelUp[up.id].split('{name}').join(st.name).split('{pct}').join(st.pct(up.to));
     F().wrap(txt, w - 116).forEach((l, i) => F().draw(ctx, l, x + 100, yy + 62 + i * 10, P.ink));
@@ -1072,7 +1086,7 @@
     const h = 120 + whyLines.length * 10 + (r.result !== 'good' ? 12 : 0) + weetje.length * 10;
     const y = Math.round(180 - h / 2 + (1 - ease) * 16);
     R().panel(ctx, x, y, w, h);
-    F().draw(ctx, head, x + w / 2, y + 12, good ? P.green2 : P.bord3, { align: 'center', scale: 2 });
+    HF().draw(ctx, head, x + w / 2, y + 14, good ? P.green2 : P.bord3, { align: 'center' });
     let yy = y + 34;
     F().draw(ctx, `${typeName}: "${r.reply}"`, x + w / 2, yy, P.ink, { align: 'center' }); yy += 13;
     whyLines.forEach(l => { F().draw(ctx, l, x + w / 2, yy, P.wood2, { align: 'center' }); yy += 10; });
@@ -1211,13 +1225,13 @@
     }
     if (id === 'doos') {
       R().rect(ctx, cx - 20, by - 28, 40, 26, P.ink); R().rect(ctx, cx - 19, by - 27, 38, 24, P.wood3); R().rect(ctx, cx - 19, by - 27, 38, 4, P.wood4);
-      F().draw(ctx, '?', cx, by - 20, P.ink, { align: 'center', scale: 2 }); return;
+      HF().draw(ctx, '?', cx, by - 20, P.ink, { align: 'center' }); return;
     }
     if (id === 'proeverij') {
       for (const dx of [-18, -2, 14]) { R().rect(ctx, cx + dx, by - 26, 8, 10, P.glass2); R().rect(ctx, cx + dx + 1, by - 21, 6, 5, P.bord3); R().rect(ctx, cx + dx + 3, by - 16, 2, 10, P.glass2); R().rect(ctx, cx + dx, by - 6, 8, 2, P.glass2); }
       return;
     }
-    F().draw(ctx, '!', cx, by - 24, P.cream3, { align: 'center', scale: 3 });
+    HF().draw(ctx, '!', cx, by - 22, P.cream3, { align: 'center' });
   }
   // Kaart tekenen op (x, y), maat CW × CH — speelkaart met ronde hoeken (besluit 58)
   UI.drawCard = function (ctx, app, id, x, y, opts) {
@@ -1291,7 +1305,7 @@
     }
     const mx = x + w / 2, my = y + h / 2;
     RR.round(ctx, mx - 30, my - 20, 60, 40, 8, P.ink); RR.round(ctx, mx - 29, my - 19, 58, 38, 7, P.gold); RR.round(ctx, mx - 27, my - 17, 54, 34, 6, P.bord1);
-    F().draw(ctx, 'CC', mx, my - 7, P.gold2, { align: 'center', scale: 2 });
+    HF().draw(ctx, 'CC', mx, my - 5, P.gold2, { align: 'center' });
   };
   // Kaart via een eigen canvas, zodat hij kan omdraaien (breedte) en wegvliegen (schaal)
   const cardCanvas = {};
@@ -1310,7 +1324,7 @@
   const ease = k => 1 - Math.pow(1 - Math.max(0, Math.min(1, k)), 3);
   UI.cardPick = function (app, ctx) {
     const s = app.s, sun = app.sunday, t = app.t - (sun.t0 || 0);
-    F().draw(ctx, 'ZONDAG', 320, 20, P.gold2, { align: 'center', scale: 2, shadow: P.ink });
+    UI.ornateTitle(ctx, 'ZONDAG', 320, 22, P.gold2, { shadow: P.ink, line: P.gold });
     F().draw(ctx, sun.chosen ? 'Volgende week' : app.canAffordCard() ? 'Kies je kaart voor volgende week' : 'Geen van beide kun je nu betalen', 320, 40, P.cream2, { align: 'center', shadow: P.ink });
     const gap = 24, x0 = 320 - CW - gap / 2, y0 = 54;
     const ct = sun.chosenT != null ? app.t - sun.chosenT : -1;
@@ -1350,7 +1364,7 @@
     }
     if (sun.chosen && ct > 1.1) {
       const T = CC.TEXT.cards[sun.chosen];
-      F().draw(ctx, T.title, 320, 150, P.gold2, { align: 'center', scale: 2, shadow: P.ink });
+      HF().draw(ctx, T.title, 320, 152, P.gold2, { align: 'center', shadow: P.ink });
       if (sun.cardMsg) F().draw(ctx, sun.cardMsg, 320, 176, P.cream2, { align: 'center', shadow: P.ink });
       UI.btn(app, ctx, 'newweek', 320 - 65, 200, 130, 20, `Week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
     }
@@ -1364,7 +1378,7 @@
     UI.drawCard(ctx, app, m.id, cx, cy, {});
     const x = cx + CW + 14, y = cy + 30, w = 262, h = 150;
     R().panel(ctx, x, y, w, h);
-    F().draw(ctx, 'Maandagochtend. Wat doe je?', x + 12, y + 12, P.bord2);
+    HF().draw(ctx, 'Maandagochtend. Wat doe je?', x + 12, y + 10, P.bord2);
     R().rect(ctx, x + 10, y + 23, w - 20, 1, P.cream1);
     if (app.mishapMsg) {
       F().wrap(app.mishapMsg, w - 24).forEach((l, i) => F().draw(ctx, l, x + 12, y + 34 + i * 10, s.mishap.lost ? P.bord3 : P.green2));
@@ -1387,7 +1401,7 @@
       const lines = []; String(n.text).split('\n').forEach((para, i) => { if (i) lines.push(''); lines.push(...F().wrap(para, pw - tx - 16)); });
       const ph = Math.max(50 + lines.length * 10 + 30, who ? 150 : 0), y = Math.round(180 - ph / 2);
       R().panel(ctx, x, y, pw, ph);
-      F().draw(ctx, n.title, x + 14, y + 12, n.good === false ? P.bord3 : P.bord2);
+      HF().draw(ctx, n.title, x + 14, y + 10, n.good === false ? P.bord3 : P.bord2);
       R().rect(ctx, x + 12, y + 23, pw - 24, 1, P.cream1);
       if (who) { UI.portrait(app, ctx, who, 'neutral', x + 16, y + 32, 76); F().draw(ctx, who === 'bankier' ? CC.TEXT.bank.name.split(' ')[1] : '', x + 54, y + 112, P.stone1, { align: 'center' }); }
       lines.forEach((l, i) => F().draw(ctx, l, x + tx, y + 32 + i * 10, n.good === false ? P.bord3 : P.ink));
@@ -1399,14 +1413,14 @@
     const pw = 320, x = 160, body = F().wrap(T.text.split('{n}').join(cap), pw - 96), tip = F().wrap(T.tip, pw - 96);
     const ph = 58 + (body.length + tip.length) * 10 + 36, y = Math.round(180 - ph / 2);
     R().panel(ctx, x, y, pw, ph);
-    F().draw(ctx, T.title, x + 14, y + 12, P.bord2);
+    HF().draw(ctx, T.title, x + 14, y + 10, P.bord2);
     R().rect(ctx, x + 12, y + 23, pw - 24, 1, P.cream1);
     // grote fles links, twee keer zo groot in hele pixels
     const img = app.images['wine_' + w.id.slice(5) + '_groot'];
     R().round(ctx, x + 16, y + 32, 52, 100, 6, P.cream3);
     if (img && img.complete && img.naturalWidth) ctx.drawImage(img, Math.round(x + 42 - img.naturalWidth), y + 38, img.naturalWidth * 2, img.naturalHeight * 2);
     else R().bottleMid(ctx, x + 42, y + 80, w);
-    F().draw(ctx, w.name, x + 80, y + 32, P.ink, { scale: 1 });
+    F().draw(ctx, w.name, x + 80, y + 32, P.ink);
     F().draw(ctx, `Maximaal ${cap} flessen per week`, x + 80, y + 43, P.bord3);
     let yy = y + 58;
     body.forEach(l => { F().draw(ctx, l, x + 80, yy, P.ink); yy += 10; });
@@ -1459,7 +1473,7 @@
       // failliet-scherm met "wat ging er mis" (besluit 77)
       const W = 380, H = 236, X = 130, Y = 62;
       R().panel(ctx, X, Y, W, H, 'dark');
-      F().draw(ctx, 'FAILLIET', 320, Y + 14, P.red, { align: 'center', scale: 2 });
+      UI.ornateTitle(ctx, 'FAILLIET', 320, Y + 16, P.bord4, { shadow: P.ink, line: P.bord3 });
       F().draw(ctx, CC.TEXT.gameOver, 320, Y + 36, P.cream2, { align: 'center' });
       // de bankier
       UI.portrait(app, ctx, 'bankier', 'grim', X + 16, Y + 52, 40);
@@ -1484,7 +1498,7 @@
       UI.dim(app, ctx, 0.5);
       for (let i = 0; i < 60; i++) { const px = (i * 97 + Math.floor(t * 40) * (i % 3 + 1)) % 640, py = (i * 53 + Math.floor(t * 60 * (1 + (i % 4) * 0.3))) % 343 + 17; R().rect(ctx, px, py, 3, 2, [P.gold, P.bord4, P.green4, P.cream3][i % 4]); }
       R().panel(ctx, 170, 80, 300, 190);
-      F().draw(ctx, 'SCHULDENVRIJ!', 320, 96, P.bord2, { align: 'center', scale: 2 });
+      UI.ornateTitle(ctx, 'SCHULDENVRIJ!', 320, 98, P.bord2, { shadow: P.gold });
       const wl = F().wrap(CC.TEXT.bank.won, 260);
       wl.forEach((l, i) => F().draw(ctx, l, 320, 118 + i * 10, P.ink, { align: 'center' }));
       let yy = 124 + wl.length * 10 + 8;
@@ -1571,7 +1585,7 @@
       ctx.drawImage(bg, 0, 0);
       UI.titleAmbience(app, ctx);
       if (logo && logo.complete && logo.naturalWidth) UI.logoGlint(app, ctx, logo, Math.round(CC.TITLE.logoX - logo.naturalWidth / 2), CC.TITLE.logoY + b);
-      else F().draw(ctx, 'CHÂTEAU CASHFLOW', CC.TITLE.logoX, 70, P.gold2, { align: 'center', scale: 3 });
+      else HF().draw(ctx, 'CHÂTEAU CASHFLOW', CC.TITLE.logoX, 70, P.gold2, { align: 'center', shadow: P.ink });
       R().rect(ctx, 0, 286, 640, 74, 'rgba(31,10,14,0.72)');
       R().rect(ctx, 0, 286, 640, 1, P.wood2);
       F().draw(ctx, CC.TEXT.tagline, 320, 294, P.cream2, { align: 'center', shadow: P.ink });
@@ -1587,7 +1601,7 @@
     }
     R().rect(ctx, 0, 0, 640, 360, 'rgba(31,10,14,0.62)');
     if (logo && logo.complete && logo.naturalWidth) ctx.drawImage(logo, Math.round(320 - logo.naturalWidth / 2), 40 + b);
-    else F().draw(ctx, 'CHÂTEAU CASHFLOW', 320, 90, P.gold2, { align: 'center', scale: 3 });
+    else HF().draw(ctx, 'CHÂTEAU CASHFLOW', 320, 90, P.gold2, { align: 'center', shadow: P.ink });
     F().draw(ctx, CC.TEXT.tagline, 320, 172, P.cream2, { align: 'center' });
     let y = 200;
     if (app.hasSave) { UI.btn(app, ctx, 'cont', 250, y, 140, 22, 'Doorgaan', () => app.continueGame(), { tone: 'bord' }); y += 28; }
@@ -1616,7 +1630,7 @@
     UI.hit(app, 'confirm_block', 0, 0, 640, 360, () => {}, null);
     const w = 280, h = 112, x = 180, y = 118;
     R().panel(ctx, x, y, w, h);
-    F().draw(ctx, 'Nieuw spel beginnen?', x + w / 2, y + 16, P.bord2, { align: 'center', scale: 2 });
+    HF().draw(ctx, 'Nieuw spel beginnen?', x + w / 2, y + 16, P.bord2, { align: 'center' });
     const lines = F().wrap(`Je spel in week ${o.week || 1} (niveau ${o.level || 1}, kas ${R().euro(o.cash || 0)}) wordt vervangen. Het blijft bewaard als reservekopie; die kun je hier later terugzetten.`, w - 40);
     lines.forEach((l, i) => F().draw(ctx, l, x + w / 2, y + 40 + i * 10, P.ink, { align: 'center' }));
     UI.btn(app, ctx, 'confirm_no', x + 24, y + h - 32, 104, 20, 'Terug', () => { app.confirmNew = false; }, { tone: 'wood' });
@@ -1732,7 +1746,7 @@
     const fixed = SIM.costsLeft(s), due = SIM.weekDue(s);
     const fy = y + AH - 44;
     R().rect(ctx, x + 10, fy - 4, AW - 20, 1, P.cream1);
-    F().draw(ctx, `Totaal ${R().euro(cost)}`, x + 16, fy + 1, P.ink, { scale: 1 });
+    F().draw(ctx, `Totaal ${R().euro(cost)}`, x + 16, fy + 1, P.ink);
     F().draw(ctx, `· kas daarna ${R().euro(after)}`, x + 22 + F().width(`Totaal ${R().euro(cost)}`), fy + 1, after < 0 ? P.red : P.ink);
     const needTxt = `Deze week nog: huur${SIM.wages(s) ? ' en loon' : ''} ${R().euro(fixed)}` + (due > 0 ? ` · zondag ${R().euro(due)}` : '');
     const tight = after < fixed + due;
