@@ -859,6 +859,34 @@
     return [sx, sy - 66];
   };
 
+  // ---------- Papier en patronen (besluit 91) ----------
+  // Eén keer gebouwd (64 × 64, vaste ruis), daarna als patroon hergebruikt; vastgezet aan het venster, zodat de
+  // textuur meeschuift. Alleen paletkleuren, hele pixels.
+  const PATS = {};
+  R.pattern = function (ctx, kind, ox, oy) {
+    let pat = PATS[kind];
+    if (!pat) {
+      const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+      if (kind === 'paper') {          // crème met fijne vezels: een paar donkere streepjes en lichte puntjes
+        g.fillStyle = P.cream2; g.fillRect(0, 0, 64, 64);
+        for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) {
+          const v = hash(x + 17, y + 5);
+          if (v < 0.011) { g.fillStyle = P.cream1; g.fillRect(x, y, v < 0.004 ? 2 : 1, 1); }
+          else if (v > 0.990) { g.fillStyle = P.cream3; g.fillRect(x, y, v > 0.996 ? 2 : 1, 1); }
+        }
+      } else if (kind === 'lattice') { // ruitjes als op een wijnetiket, heel licht
+        g.fillStyle = P.cream1; g.fillRect(0, 0, 64, 64);
+        g.fillStyle = P.cream2;
+        for (let y = 0; y < 64; y += 8) for (let x = 0; x < 64; x += 8) { g.fillRect(x, y, 1, 1); g.fillRect(x + 4, y + 4, 1, 1); }
+      }
+      pat = PATS[kind] = { img: c, byCtx: new WeakMap() };
+    }
+    let cp = pat.byCtx.get(ctx);
+    if (!cp) { cp = ctx.createPattern(pat.img, 'repeat'); pat.byCtx.set(ctx, cp); }
+    if (cp.setTransform && typeof DOMMatrix !== 'undefined') cp.setTransform(new DOMMatrix([1, 0, 0, 1, Math.round(ox || 0), Math.round(oy || 0)]));
+    return cp;
+  };
+
   // ---------- UI-bouwstenen ----------
   // Houten kader met perkament (9-slice in code)
   R.panel = function (ctx, x, y, w, h, style) {
@@ -870,8 +898,17 @@
     R.round(ctx, x + 1, y + 1, w - 2, h - 2, 9, P.wood3);
     R.round(ctx, x + 2, y + 2, w - 4, h - 4, 8, P.wood2);
     R.round(ctx, x + 4, y + 4, w - 8, h - 8, 7, P.gold);
-    R.round(ctx, x + 5, y + 5, w - 10, h - 10, 6, dark ? P.bord1 : P.cream2);
-    if (!dark) R.rect(ctx, x + 11, y + 5, w - 22, 1, P.cream3);
+    if (dark) { R.round(ctx, x + 5, y + 5, w - 10, h - 10, 6, P.bord1); R.round(ctx, x + 7, y + 7, w - 14, h - 14, 5, P.bord2); R.round(ctx, x + 8, y + 8, w - 16, h - 16, 4, P.bord1); return; }
+    // papier met een fijne binnenlijn, zoals een kaart (besluit 91)
+    R.round(ctx, x + 5, y + 5, w - 10, h - 10, 6, R.pattern(ctx, 'paper', x, y));
+    R.rect(ctx, x + 11, y + 5, w - 22, 1, P.cream3);
+    const ix = x + 7, iy = y + 7, iw = w - 14, ih = h - 14;
+    R.rect(ctx, ix + 4, iy, iw - 8, 1, P.cream1); R.rect(ctx, ix + 4, iy + ih - 1, iw - 8, 1, P.cream1);
+    R.rect(ctx, ix, iy + 4, 1, ih - 8, P.cream1); R.rect(ctx, ix + iw - 1, iy + 4, 1, ih - 8, P.cream1);
+    for (const [cx, cy, dx, dy] of [[ix, iy, 1, 1], [ix + iw - 1, iy, -1, 1], [ix, iy + ih - 1, 1, -1], [ix + iw - 1, iy + ih - 1, -1, -1]]) {
+      R.rect(ctx, cx + dx * 1, cy + dy * 2, 1, 1, P.cream1); R.rect(ctx, cx + dx * 2, cy + dy * 1, 1, 1, P.cream1);   // afgeronde hoek
+      R.rect(ctx, cx + dx * 1, cy + dy * 3, 1, 1, P.cream1); R.rect(ctx, cx + dx * 3, cy + dy * 1, 1, 1, P.cream1);
+    }
   };
 
   R.button = function (ctx, x, y, w, h, label, state) {

@@ -670,7 +670,11 @@
     const key = tl.kind === 'decor' ? tl.id : tl.kind === 'crowd' ? 'crowd' : tl.kind === 'upgrade' ? (/^kast/.test(tl.id) ? 'kast' : tl.id) : (tl.kind === 'staff' || tl.kind === 'type') ? tl.id : null;
     const ti = key && app.images['tile_' + key];
     if (ti && ti.complete && ti.naturalWidth) { ctx.drawImage(ti, Math.round(cx - ti.naturalWidth / 2), by - 1 - ti.naturalHeight); return; }
-    if (tl.kind === 'wine') { if (!R().wineSprite(ctx, tl.wine, 'groot', cx, by)) R().rect(ctx, cx - 5, by - 30, 10, 30, tl.wine.glass); return; }
+    if (tl.kind === 'wine') {
+      if (tl.solo) { R().wineSprite(ctx, tl.wine, 'icoon', cx - 15, by - 3); R().wineSprite(ctx, tl.wine, 'icoon', cx + 15, by - 3); }   // alleen een wijn: kleine opstelling
+      if (!R().wineSprite(ctx, tl.wine, 'groot', cx, by)) R().rect(ctx, cx - 5, by - 30, 10, 30, tl.wine.glass);
+      return;
+    }
     if (tl.kind === 'staff' || tl.kind === 'type') {
       const im = app.images['chr_' + tl.id + '_front'];
       if (im && im.complete && im.naturalWidth) { const h = 40, w = Math.round(im.naturalWidth * h / im.naturalHeight); ctx.drawImage(im, Math.round(cx - w / 2), by - h, w, h); }
@@ -710,8 +714,10 @@
       ctx.globalAlpha = k; const oy = Math.round((1 - k) * 8);
       R().round(ctx, bx, by + oy, bw, bh, 8, P.gold);
       R().round(ctx, bx + 1, by + 1 + oy, bw - 2, bh - 2, 7, '#fffaf0');
-      R().round(ctx, bx + 5, by + 5 + oy, bw - 10, bh - 36, 6, P.cream1);
+      R().round(ctx, bx + 5, by + 5 + oy, bw - 10, bh - 36, 6, R().pattern(ctx, 'lattice', bx + 5, by + 5 + oy));   // ruitjes (besluit 91)
+      R().round(ctx, bx + 24, by + bh - 36 + oy, bw - 48, 4, 2, 'rgba(122,74,36,0.18)');                            // vloertje onder de figuren
       const tiles = (refs || []).map(r => refTile(app, r)).filter(Boolean);
+      if (tiles.length === 1 && tiles[0].kind === 'wine') tiles[0].solo = true;
       tiles.forEach((tl, j) => { const cx = bx + bw / 2 + (tiles.length > 1 ? (j ? 1 : -1) * bw / 5 : 0); tileIcon(app, ctx, tl, cx, by + bh - 32 + oy); });
       F().draw(ctx, label || '', bx + bw / 2, by + bh - 26 + oy, P.ink, { align: 'center' });
       F().draw(ctx, sub || '', bx + bw / 2, by + bh - 15 + oy, P.bord3, { align: 'center' });
@@ -1761,7 +1767,12 @@
     head.forEach(([t, cx, al]) => F().draw(ctx, t, x + cx, top, P.bord2, { align: al }));
     R().rect(ctx, x + 10, top + 9, AW - 20, 1, P.cream1);
     const wines = SIM.unlockedWines(s);
-    const rowH = wines.length > 10 ? 15 : 16;
+    // besluit 91: rijhoogte groeit mee met de ruimte. Rijk (≥ 44): grote fles, soort en stijl, blurb.
+    // Midden (≥ 24): kleine fles en één regel soort en stijl. Anders compact zoals voorheen.
+    const avail = (y + AH - 44 - 8) - (top + 12);
+    const fitH = Math.floor(avail / Math.max(1, wines.length));
+    const rowH = fitH >= 44 ? Math.min(48, fitH) : fitH >= 24 ? Math.min(34, fitH) : Math.max(15, Math.min(20, fitH));
+    const rich = rowH >= 44, mid = !rich && rowH >= 24;
     let ry = top + 12;
     wines.forEach((w, i) => {
       const id = w.id, n = order[id] || 0, have = SIM.totalBottles(s, id), vak = SIM.vakOfWine(s, id);
@@ -1770,18 +1781,30 @@
       if (UI.focusOn(app, id)) R().round(ctx, x + 8, ry - 1, AW - 16, rowH, 4, `rgba(232,181,58,${UI.focusOn(app, id)})`);
       else if (here) R().round(ctx, x + 8, ry - 1, AW - 16, rowH, 4, 'rgba(232,181,58,0.35)');
       else if (i % 2 === 0) R().round(ctx, x + 8, ry - 1, AW - 16, rowH, 4, P.cream3);
-      R().bottleMid(ctx, x + 19, ry + Math.floor(rowH / 2) - 1, w, 'schap');
-      F().draw(ctx, w.name, x + 30, ry + 3, vak || have ? P.ink : P.stone1);
+      const NX = rich ? 36 : mid ? 30 : 30;   // begin van de naam
+      if (rich) { if (!R().wineSprite(ctx, w, 'groot', x + 21, ry + rowH - 4)) R().bottleMid(ctx, x + 21, ry + Math.floor(rowH / 2), w, 'schap'); }
+      else if (mid) { if (!R().wineSprite(ctx, w, 'icoon', x + 19, ry + rowH - 1)) R().bottleMid(ctx, x + 19, ry + Math.floor(rowH / 2) - 1, w, 'schap'); }
+      else R().bottleMid(ctx, x + 19, ry + Math.floor(rowH / 2) - 1, w, 'schap');
+      F().draw(ctx, w.name, x + NX, ry + 3, vak || have ? P.ink : P.stone1);
+      if (rich || mid) {   // soort en stijl, en bij rijke rijen de blurb over de volle breedte
+        const stijl = (w.stijl || []).filter(st => st !== 'bubbels').map(st => CC.TEXT.stijlAdj[st] || st);
+        const kind = [CC.TEXT.soortName[CC.roleById(w.role).kind]].concat(stijl).join(', ');
+        const desc = `${kind} · ${w.druif.join(', ')} · ${w.regio}, ${w.country}`;
+        const l2 = rich ? 16 : 13, l3 = rich ? 27 : 23;
+        F().draw(ctx, desc, x + NX, ry + l2, P.wood2);
+        const nb = Math.floor((rowH - l3 - 1) / 10);   // zoveel blurbregels passen er nog in de rij
+        if (w.blurb && nb > 0) F().wrap(w.blurb, AW - NX - 24).slice(0, nb).forEach((l, j) => F().draw(ctx, l, x + NX, ry + l3 + j * 10, P.stone1));
+      }
       if (scarce) {
         const tag = left > 0 ? `nog ${left}` : 'op';
-        F().draw(ctx, tag, x + 34 + F().width(w.name), ry + 3, left > 0 ? P.wood2 : P.red);
-        UI.hit(app, 'sc_' + id, x + 30, ry, F().width(w.name) + F().width(tag) + 6, rowH - 2, null, `Schaars: Ronnie heeft er ${CC.roleById(w.role).scarce} per week. Maandag weer nieuwe.`);
+        F().draw(ctx, tag, x + NX + 4 + F().width(w.name), ry + 3, left > 0 ? P.wood2 : P.red);
+        UI.hit(app, 'sc_' + id, x + NX, ry, F().width(w.name) + F().width(tag) + 6, 13, null, `Schaars: Ronnie heeft er ${CC.roleById(w.role).scarce} per week. Maandag weer nieuwe.`);
       }
       F().draw(ctx, String(have), x + 172, ry + 3, have ? P.ink : P.stone2, { align: 'right' });
       // "Tot": na deze bestelling heb je er zoveel, en tot hier vult Ronnie morgen weer aan
       const upto = have + n, tgt = SIM.target(s, id);
       F().draw(ctx, upto ? String(upto) : '-', x + 204, ry + 3, n ? P.bord2 : (upto ? P.wood2 : P.stone2), { align: 'right' });
-      UI.hit(app, 'upto_' + id, x + 178, ry, 30, rowH - 2, null, upto ? `Na deze bestelling heb je ${upto} flessen ${w.name}. Morgen vult Ronnie weer aan tot ${upto}.` + (tgt && tgt !== upto ? ` (nu staat je lijst op ${tgt})` : '') : 'Niet op je lijst: Ronnie levert niets');
+      UI.hit(app, 'upto_' + id, x + 178, ry, 30, 13, null, upto ? `Na deze bestelling heb je ${upto} flessen ${w.name}. Morgen vult Ronnie weer aan tot ${upto}.` + (tgt && tgt !== upto ? ` (nu staat je lijst op ${tgt})` : '') : 'Niet op je lijst: Ronnie levert niets');
       // −6 · aantal · +6 · +12
       const cap = Math.min(left, C.targetMax);
       const set = v => { order[id] = Math.max(0, Math.min(cap, v)); if (!order[id]) delete order[id]; app.orderMsg = null; };
@@ -1829,7 +1852,7 @@
     if (cur) opts.push({ id: null, label: 'Van het schap halen' });
     const mw = Math.max(...opts.map(o => F().width(o.label))) + 18, mh = opts.length * 13 + 8;
     const mx = x + AW - 12 - mw;
-    let my = top + 12 + (i + 1) * rowH;
+    let my = top + 12 + i * rowH + 15;   // direct onder de knop (rijen kunnen hoger zijn dan de knop)
     if (my + mh > y + AH - 8) my = top + 12 + i * rowH - mh - 2;
     UI.hit(app, 'shelf_menu', mx, my, mw, mh, () => {}, null);
     R().round(ctx, mx + 2, my + 3, mw, mh, 5, 'rgba(31,10,14,0.35)');

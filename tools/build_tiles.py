@@ -3,7 +3,7 @@
 #          rij 1: kast, koeling (ijsemmer), vitrine (proeftafel), uithangbord
 #          rij 2: crowd (groepje klanten), buurt, koopjes, liefhebber
 #          rij 3: snob, sem, fatima, dubois
-# Uitvoer: assets/tile_<naam>.png  (past in het tegelvak, ± 88 × 40)
+# Uitvoer: assets/tile_<naam>.png  (past in het tegelvak, ± 80 × 72)
 #          assets/icon_<naam>.png  (alleen de vier upgrades; past in het icoonvak, ± 34 × 34)
 #          assets/tiles.js
 # Draaien: python tools/build_tiles.py
@@ -19,7 +19,7 @@ ROWS = [['kast', 'koeling', 'vitrine', 'uithangbord'],
         ['crowd', 'buurt', 'koopjes', 'liefhebber'],
         ['snob', 'sem', 'fatima', 'dubois']]
 ICONS = ['kast', 'koeling', 'vitrine', 'uithangbord']
-TILE_W, TILE_H = 88, 40
+TILE_W, TILE_H = 80, 72          # besluit 91: op ware grootte voor het tegelvak (was 88 × 40)
 ICON_W, ICON_H = 34, 34
 INK = (31, 10, 14)
 
