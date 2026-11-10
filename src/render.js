@@ -776,12 +776,19 @@
 
   // ---------- Klanten (placeholder, ± 66 px hoog; wordt vervangen door gegenereerde sprites) ----------
   // Gegenereerde sprite (als geladen), anders de placeholder hieronder.
+  R.crowdOffset = function (c) {
+    if (c.staff || typeof c.id !== 'number') return [0, 0];
+    const h = (c.id * 2654435761) >>> 0;
+    return [(h % 11) - 5, ((h >>> 8) % 5) - 2];   // −5..5 px opzij, −2..2 px diepte
+  };
   R.drawCustomerSprite = function (ctx, c, images) {
     const view = c.toward ? 'front' : 'back';
     const look = c.sprite || c.type;
     const img = images['chr_' + look + '_' + view];
     if (!img || !img.complete || !img.naturalWidth) return null;
-    const [sx, sy0] = R.iso(c.x, c.y);
+    const [sx0, sy00] = R.iso(c.x, c.y);
+    // vaste kleine verschuiving per klant (alleen beeld, niet in de sim): wie op dezelfde plek staat wordt geen kluit (besluit 90)
+    const [ox, oy] = R.crowdOffset(c), sx = sx0 + ox, sy0 = sy00 + oy;
     const step = c.moving ? (Math.floor(c.walkPhase * 3) % 2) : 0;
     const w = img.naturalWidth, h = img.naturalHeight;
     const native = (CC.SPRITE_FACING[look] || CC.SPRITE_FACING[c.type] || {})[view] || -1;
@@ -885,23 +892,29 @@
     CC.FONT.draw(ctx, label, x + w / 2, y + Math.floor((h - 7) / 2) + press, txtCol, { align: 'center', shadow: state.active || state.disabled ? null : lo });
   };
 
-  R.bubble = function (ctx, x, y, text, tone, alpha, placed) {
+  // Plek voor een ballon zoeken dicht bij het hoofd (besluit 90): recht erboven, iets opzij of een stapje hoger.
+  // Lukt dat niet zonder overlap met `placed` (andere ballonnen, het uithangbord, de bedragen), dan null: de ballon wacht.
+  R.bubbleFit = function (x, y, text, placed) {
     const lines = CC.FONT.wrap(text, 110);
     const w = Math.max(...lines.map(l => CC.FONT.width(l))) + 8;
     const h = lines.length * 10 + 5;
-    let bx = Math.round(x - w / 2), by = Math.round(y - h - 5);
-    bx = Math.max(2, Math.min(R.W - w - 2, bx));
-    by = Math.max(18, by);
-    // niet over andere ballonnen heen: schuif omhoog (of omlaag als het niet past)
-    if (placed) {
-      for (let tries = 0; tries < 8; tries++) {
-        const hit = placed.find(r => bx < r.x + r.w + 2 && bx + w + 2 > r.x && by < r.y + r.h + 4 && by + h + 4 > r.y);
-        if (!hit) break;
-        const up = hit.y - h - 5;
-        by = up >= 18 ? up : hit.y + hit.h + 5;
-      }
-      placed.push({ x: bx, y: by, w, h });
+    const free = (bx, by) => by >= 18 && !(placed || []).some(r => bx < r.x + r.w + 2 && bx + w + 2 > r.x && by < r.y + r.h + 4 && by + h + 4 > r.y);
+    const base = Math.round(x - w / 2), top = Math.round(y - h - 5);
+    for (const dy of [0, -12, -24]) for (const dx of [0, -Math.round(w / 2) + 8, Math.round(w / 2) - 8]) {
+      const bx = Math.max(2, Math.min(R.W - w - 2, base + dx)), by = top + dy;
+      if (free(bx, by)) return { bx, by, w, h, lines };
     }
+    return null;
+  };
+  R.bubble = function (ctx, x, y, text, tone, alpha, placed, fit) {
+    fit = fit || R.bubbleFit(x, y, text, placed);
+    let bx, by, w, h, lines;
+    if (fit) ({ bx, by, w, h, lines } = fit);
+    else {   // geen vrije plek (alleen buiten de winkel gebruikt): gewoon boven het hoofd
+      lines = CC.FONT.wrap(text, 110); w = Math.max(...lines.map(l => CC.FONT.width(l))) + 8; h = lines.length * 10 + 5;
+      bx = Math.max(2, Math.min(R.W - w - 2, Math.round(x - w / 2))); by = Math.max(18, Math.round(y - h - 5));
+    }
+    if (placed) placed.push({ x: bx, y: by, w, h });
     const border = { red: P.red, grey: P.stone1, bord: P.bord3, gold: P.gold, green: P.ok }[tone] || P.ink;
     ctx.globalAlpha = alpha == null ? 1 : alpha;
     R.round(ctx, bx, by, w, h, 4, border);

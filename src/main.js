@@ -570,7 +570,7 @@
         CC.FX.drawCritter(ctx, it.critter);
       } else {
         const head = R.drawCustomerSprite(ctx, it.c, app.images) || R.drawCustomer(ctx, it.c, app.t);
-        if (it.c.bubble) heads.push({ head, b: it.c.bubble });
+        if (it.c.bubble) heads.push({ head, b: it.c.bubble, c: it.c });
         if (it.c.state === 'ask') asks.push({ head, c: it.c });
       }
     }
@@ -579,8 +579,25 @@
     if (PAINT && hover === 'w_vitrine' && CC.BG_LAYERS && app.images.layer_table) { const TL = CC.BG_LAYERS.table, im = app.images.layer_table; R.hoverBox(ctx, { x: TL.x + 6, y: TL.y, w: im.naturalWidth - 12, h: Math.round(im.naturalHeight * 0.6) }); }
     // tekstballonnen en zwevende bedragen boven alles
     const placed = asks.map(a => ({ x: a.head[0] - 9, y: a.head[1] - 30, w: 19, h: 28 }));   // ballonnen niet over een !
+    // besluit 90: nooit over het uithangbord (en de HUD: R.bubble houdt y ≥ 18)
+    const sg = CC.BG && CC.BG.sign, sgi = app.images.logoSign;
+    if (sg) placed.push({ x: sg.x - 2, y: sg.y - 2, w: (sgi && sgi.naturalWidth || 72) + 4, h: (sgi && sgi.naturalHeight || 33) + 4 });
+    // bedragen bij de kassa (UI.cashFloat) bezetten de zone onder het bord
+    const rgz = CC.BG && CC.BG.register;
+    if (app.day && app.day.floats.some(f => f.cash) && sg && rgz) placed.push({ x: rgz.x + rgz.w / 2 - 46, y: sg.y + 34, w: 92, h: 46 });
+    // hooguit drie ballonnen tegelijk; nieuwe wachten tot er plek is (en vervallen als hun tijd erop zit)
+    const MAXB = 3, shown = app.bubblesShown || (app.bubblesShown = new Set());
+    for (const b of shown) if (!heads.some(h => h.b === b)) shown.delete(b);
     heads.sort((a, b) => a.head[1] - b.head[1]);
-    if (!app.advice) for (const h of heads) R.bubble(ctx, h.head[0], h.head[1] - 1, h.b.text, h.b.tone, Math.min(1, h.b.t * 3), placed);   // niet boven het adviesvenster uit
+    if (!app.advice) {   // niet boven het adviesvenster uit
+      const fits = new Map();
+      for (const h of heads) if (shown.has(h.b)) { const f = R.bubbleFit(h.head[0], h.head[1] - 1, h.b.text, placed); fits.set(h, f); if (f) placed.push({ x: f.bx, y: f.by, w: f.w, h: f.h }); }
+      for (const h of heads) if (!shown.has(h.b) && shown.size < MAXB && h.b.t > 1.0) {
+        const f = R.bubbleFit(h.head[0], h.head[1] - 1, h.b.text, placed);
+        if (f) { shown.add(h.b); fits.set(h, f); placed.push({ x: f.bx, y: f.by, w: f.w, h: f.h }); }
+      }
+      for (const [h, f] of fits) if (f) R.bubble(ctx, h.head[0], h.head[1] - 1, h.b.text, h.b.tone, Math.min(1, h.b.t * 3), null, f);
+    }
     // adviesvragen: ! boven het hoofd, klik op de klant
     for (const a of asks) {
       const frac = Math.max(0, a.c.patience / CC.CONFIG.advicePatience);

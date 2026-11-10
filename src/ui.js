@@ -39,7 +39,12 @@
     const tw = F().width(f.text), ew = extra ? F().width(extra) : 0;
     const w = tw + ew + 17, h = 13;
     const cx = rg.x + rg.w / 2;
-    const y = Math.round(rg.y - 13 - age * 10 - (f.stack || 0) * 16 + (1 - pop) * 4);
+    // besluit 90: onder het uithangbord in plaats van erover. Rij van hooguit drie, van boven naar beneden;
+    // het label springt omhoog op zijn plek en zakt niet verder door naar het bord.
+    const sg = (CC.BG && CC.BG.sign) || { x: 285, y: 49 }, sgImg = CC.IMAGES && CC.IMAGES.logoSign;
+    const top = sg.y + (sgImg && sgImg.naturalHeight ? sgImg.naturalHeight : 33) + 3;
+    const slot = (f.stack || 0) % 3;
+    const y = Math.round(top + slot * 15 + (1 - pop) * 5);
     const x = Math.round(cx - w / 2);
     ctx.globalAlpha = fade;
     R().round(ctx, x - 1, y - 1, w + 2, h + 2, 4, P.ink);
