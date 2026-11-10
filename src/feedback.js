@@ -10,21 +10,20 @@
 
   // ---------- Stijl ----------
   const css = `
-  #fb-btn { position: fixed; z-index: 5; display: flex; align-items: center; gap: 7px;
-    font: bold 13px Georgia, 'Times New Roman', serif; color: #fdf6e3; letter-spacing: .3px;
-    padding: 6px 13px 6px 10px; background: #6e1a26; border: 2px solid #1f0a0e; border-radius: 8px;
+  #fb-btn { position: fixed; z-index: 5; display: flex; align-items: center; gap: .54em;
+    font: bold clamp(11px, calc(13px * var(--gs, 1)), 20px) Georgia, 'Times New Roman', serif; color: #fdf6e3; letter-spacing: .3px;
+    padding: .46em 1em .46em .77em; background: #6e1a26; border: 2px solid #1f0a0e; border-radius: 8px;
     outline: 1px solid rgba(232,181,58,.55); outline-offset: -5px;
     box-shadow: 0 2px 0 #3e0f16; cursor: pointer; opacity: .88; transition: opacity .15s, transform .1s, filter .15s; }
   #fb-btn:hover { opacity: 1; filter: brightness(1.15); }
   #fb-btn:active { transform: translateY(2px); box-shadow: 0 0 0 #3e0f16; }
-  #fb-btn svg { width: 14px; height: 14px; image-rendering: pixelated; flex: none; }
-  #fb-btn.tight { padding: 5px 8px; opacity: .6; }
-  #fb-btn.tight span { display: none; }
-  #fb-btn.tight:hover { opacity: 1; }
+  #fb-btn svg { width: 1.08em; height: 1.08em; image-rendering: pixelated; flex: none; }
+  #fb-btn.tight { display: none; }   /* geen ruimte naast het beeld: icoon in de HUD (ui.js) */
+  body.fs #fb-btn { display: none; }   /* volledig scherm = spelen; knop staat in het venster ernaast */
 
   #fb-box { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(31,10,14,.7); z-index: 11; }
-  #fb-box .card { width: min(440px, 92vw); box-sizing: border-box; background: #f3e6c8; border: 3px solid #5a3a22;
+  #fb-box .card { transform: scale(clamp(.8, var(--gs, 1), 1.6)); width: min(440px, 92vw); box-sizing: border-box; background: #f3e6c8; border: 3px solid #5a3a22;
     outline: 2px solid #e8b53a; outline-offset: -7px; border-radius: 12px; padding: 18px 20px 16px;
     box-shadow: 0 6px 0 rgba(31,10,14,.45); font: 14px/1.4 Georgia, 'Times New Roman', serif; color: #1f0a0e; }
   #fb-box h2 { margin: 0 0 2px; font-size: 18px; color: #7a1f2b; }
@@ -106,6 +105,7 @@
     if (document.activeElement) document.activeElement.blur();
   }
   btn.addEventListener('click', () => { btn.blur(); open(); });
+  CC.openFeedback = open;
   $('.close').onclick = close;
   send.onclick = submit;
 
@@ -169,13 +169,13 @@
     } else if (vw - r.right >= bw + gap * 2) {       // rechts, onderaan uitgelijnd
       btn.style.left = Math.round(r.right + gap) + 'px';
       btn.style.top = Math.round(r.bottom - bh) + 'px';
-    } else {                                         // geen ruimte: compact in de hoek
+    } else {                                         // geen ruimte: de knop zit dan als icoon in de HUD (in de canvas)
       btn.classList.add('tight');
-      btn.style.right = gap + 'px';
-      btn.style.bottom = gap + 'px';
     }
+    CC.feedbackInCanvas = btn.classList.contains('tight') || document.body.classList.contains('fs');
   }
   window.addEventListener('resize', () => requestAnimationFrame(place));
+  document.addEventListener('fullscreenchange', () => requestAnimationFrame(place));
   if (window.ResizeObserver && canvas) new ResizeObserver(() => place()).observe(canvas);
   place();
 })();

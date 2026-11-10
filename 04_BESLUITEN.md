@@ -6,6 +6,16 @@
 
 ---
 
+## 2026-11-10 — Polish-ronde (handoff Fable, pakket A)
+
+Review door Fable op de GitHub-versie van 30-09; uitgevoerd op de lokale map. Geen spelregels, balans of teksten veranderd.
+
+| # | Besluit | Reden |
+|---|---|---|
+| 87 | **Schaling: het venster vullen, 16:9, plus volledig scherm (vervangt 12).** Intern blijft alles 640×360 in hele pixels: het spel tekent naar een buffer van 640×360 (`main.js`), die elke frame op de kleinste hele schaal k naar de zichtbare canvas gaat waarbij die minstens zo groot is als de doelmaat; CSS verkleint naar de doelmaat (zo groot mogelijk in het venster, 16:9, veelvoud van 16 apparaatpixels). Exact passend (bv. 1920×1080 = 3×): `image-rendering: pixelated`, beeld pixel voor pixel gelijk aan vroeger. Niet-heel: de gewone (zachte) verkleining van de browser; vergeleken op screenshots oogt die rustiger dan nearest-neighbour, dat lettersteeltjes ongelijk dik maakt. Gemeten: 1920×950 → 1680 px breed (was 1280), 1366×650 → 1152 (was 640), 1536×730 bij 125% → 1293 CSS-px (was 1024), telefoon 390 breed → 389 (was 213). Muis via `getBoundingClientRect()`; klikvlakken gecontroleerd op alle maten. **Volledig scherm:** knop "Volledig scherm" rechtsboven op het titelscherm, klein icoon rechts in de HUD, toets F (Fullscreen API op het hele document, zodat de HTML-vensters erboven blijven werken; de klik wordt direct in `mousedown` afgehandeld, want de browser staat het alleen binnen een gebaar toe). HUD-rechts schoof daarvoor 14–28 px op. **Feedback en spelcode:** schalen mee met het spelbeeld (`--gs`); heeft de feedbackknop naast het beeld geen plek (exact 16:9-venster, volledig scherm), dan staat hij als icoon in de HUD en als knop linksboven op het titelscherm in plaats van over "Winkel openen" heen. | In een gewoon browservenster was het spel 1280 of zelfs 640 px breed met brede donkere randen. Hele schaal tekenen en daarna verkleinen houdt de pixelkunst strak waar het kan en vult toch het scherm. |
+
+---
+
 ## 2026-10-01 — Intro bij de eerste start
 
 | # | Besluit | Reden |
@@ -156,7 +166,7 @@ HJ: "ik zorg vooral dat de schappen vol zijn en laat een dag lopen; prijzen schu
 | 9 | **Run-lengte:** ± 45–60 min (8 weken × 6 verkoopdagen van ± 30 sec). | In één avond uit te spelen. |
 | 10 | ~~**Echte wijnen.**~~ *(vervangen door 32)* 12 rollen met vaste spelwaarden; HJ kiest per rol een echte wijn (3 opties per rol of eigen keuze). Later uitbreiden kan per rol. | Herkenbaarheid; privéproject, niet commercieel. Door de spelwaarden aan de rol te hangen, verandert een andere wijn de balans niet. |
 | 11 | **Isometrische kamer (2:1)** als hoofdscherm, uit het prototype overgenomen. | Beste onderdeel van het prototype. |
-| 12 | **Eén pixelgrid voor wereld én UI: 640×360, integer-schaling, nearest-neighbour.** | Oplossing voor wisselende scherpte en het "webpagina"-gevoel. |
+| 12 | **Eén pixelgrid voor wereld én UI: 640×360, integer-schaling, nearest-neighbour.** *(Schaling vervangen door 87: venster vullen; het pixelgrid van 640×360 blijft.)* | Oplossing voor wisselende scherpte en het "webpagina"-gevoel. |
 | 13 | **Alle AI-beelden via de pixelpipeline** (verkleinen naar native maat + masterpalet). | Beeldmodellen leveren geen consistente pixelgrootte. |
 | 14 | **UI in de spelwereld:** klikken op objecten, kleine HUD, pixelkaders; geen pagina-layout, geen webfonts. | Het prototype voelde als een website. |
 | 15 | **Logo is canon** voor titelscherm en branding. | HJ vindt het goed. |

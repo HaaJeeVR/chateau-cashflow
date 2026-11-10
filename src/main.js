@@ -4,9 +4,13 @@
   const CC = window.CC;
   const R = CC.R, UI = CC.UI, SIM = CC.SIM, DAY = CC.DAY, DBG = CC.DBG, P = CC.PAL;
 
+  // Alles tekent naar een buffer van 640×360 (één pixelgrid). De zichtbare canvas krijgt die buffer
+  // elke frame op een hele schaal k; CSS zet hem op de maat van het venster (besluit 87).
   const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  canvas.width = R.W; canvas.height = R.H;
+  const out = canvas.getContext('2d');
+  const buf = document.createElement('canvas');
+  buf.width = R.W; buf.height = R.H;
+  const ctx = buf.getContext('2d');
   ctx.imageSmoothingEnabled = false;
 
   const app = {
@@ -36,15 +40,49 @@
   CC.IMAGES = app.images;
   const logoSign = new Image(); logoSign.onload = () => { R.roomCache = null; }; logoSign.src = 'assets/logo_sign.png'; app.images.logoSign = logoSign;
 
-  // ---------- Schaling: integer in apparaatpixels ----------
+  // ---------- Schaling (besluit 87, vervangt 12): venster vullen, 16:9 ----------
+  // Doelmaat in apparaatpixels = zo groot mogelijk binnen het venster. De canvas krijgt de kleinste hele
+  // schaal k van 640×360 die minstens zo groot is; CSS verkleint hem naar de doelmaat. Past het exact
+  // (bv. 1920×1080 = 3×), dan wordt er niets geschaald en is het beeld pixel voor pixel gelijk aan 3×.
+  let K = 1;
   function fit() {
     const dpr = window.devicePixelRatio || 1;
-    const s = Math.max(1, Math.floor(Math.min(window.innerWidth * dpr / R.W, window.innerHeight * dpr / R.H)));
-    canvas.style.width = (R.W * s / dpr) + 'px';
-    canvas.style.height = (R.H * s / dpr) + 'px';
-    app.scale = s / dpr;
+    const cssW = Math.min(window.innerWidth, window.innerHeight * R.W / R.H);
+    const devW = Math.max(16, Math.floor(cssW * dpr / 16) * 16);   // veelvoud van 16: hoogte blijft heel (16:9)
+    const devH = devW * R.H / R.W;
+    const k = Math.max(1, Math.ceil(devW / R.W - 1e-9));
+    if (canvas.width !== R.W * k) { canvas.width = R.W * k; canvas.height = R.H * k; }
+    K = k;
+    out.imageSmoothingEnabled = false;
+    canvas.style.width = (devW / dpr) + 'px';
+    canvas.style.height = (devH / dpr) + 'px';
+    // Exact passend: geen schaling. Anders verkleint de browser met zijn gewone (zachte) filter:
+    // dat oogt rustiger dan nearest-neighbour, dat pixels ongelijk breed maakt (tekst!).
+    canvas.style.imageRendering = devW === R.W * k ? 'pixelated' : 'auto';
+    app.scale = devW / dpr / R.W;                                   // CSS-px per spelpixel
+    document.documentElement.style.setProperty('--gs', (devW / dpr / 1280).toFixed(4));   // voor HTML-vensters (feedback, spelcode)
   }
   window.addEventListener('resize', fit); fit();
+  if (window.matchMedia) {   // schaal 100% ↔ 125% of ander scherm: devicePixelRatio verandert zonder resize
+    const watchDpr = () => { const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`); const h = () => { fit(); watchDpr(); }; mq.addEventListener ? mq.addEventListener('change', h, { once: true }) : mq.addListener(h); };
+    watchDpr();
+  }
+  function present() { out.drawImage(buf, 0, 0, R.W * K, R.H * K); }
+
+  // ---------- Volledig scherm (Fullscreen API) ----------
+  // Het hele document gaat fullscreen (niet alleen de canvas), zodat de HTML-vensters erboven blijven werken.
+  const fsEl = document.documentElement;
+  app.fsAvailable = !!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen);
+  app.isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  app.toggleFullscreen = function () {
+    if (!app.fsAvailable) return;
+    try {
+      if (app.isFullscreen()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else { const p = (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen).call(fsEl); if (p && p.catch) p.catch(() => {}); }
+    } catch (e) { /* geweigerd door de browser: niets aan de hand */ }
+  };
+  const fsChange = () => { document.body.classList.toggle('fs', app.isFullscreen()); fit(); };
+  document.addEventListener('fullscreenchange', fsChange); document.addEventListener('webkitfullscreenchange', fsChange);
 
   function toGame(e) {
     const r = canvas.getBoundingClientRect();
@@ -52,7 +90,14 @@
   }
   canvas.addEventListener('mousemove', e => { app.mouse = toGame(e); });
   canvas.addEventListener('mouseleave', () => { app.mouse = { x: -1, y: -1 }; });
-  canvas.addEventListener('mousedown', e => { if (e.button === 0) app.click = toGame(e); });
+  canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    const p = toGame(e);
+    // fullscreen moet binnen de klik zelf (gebruikersgebaar), niet pas in de volgende frame
+    const h = app.phase !== 'intro' && UI.pick(p.x, p.y);
+    if (h && h.id === 'fullscreen') { app.toggleFullscreen(); return; }
+    app.click = p;
+  });
 
   // ---------- Intro (besluit 86): bij de eerste start, vóór het titelscherm ----------
   // Speelt één keer (vlag in de instellingen, niet in de spelsave); klik, toets of tik slaat over; "Intro" in het menu speelt hem opnieuw.
@@ -91,6 +136,7 @@
     if (app.codeOpen) { if (e.key === 'Escape') app.closeCode(); return; }   // typen in het codevenster
     if (app.confirmNew) { if (e.key === 'Escape') app.confirmNew = false; if (e.key === 'Enter') app.newGame(); return; }
     if (e.key === 'F1') { e.preventDefault(); DBG.on = !DBG.on; }
+    if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) { app.toggleFullscreen(); return; }
     if (app.advice) {
       const A = app.advice;
       if (e.key === 'Escape') app.closeAdvice();
@@ -647,6 +693,7 @@
   function loop(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     frame(dt);
+    present();
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);

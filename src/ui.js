@@ -58,6 +58,52 @@
       rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') R().rect(ctx, x + i + ox, y + j + oy, 1, 1, c); });
   };
 
+  // ---------- Volledig scherm (besluit 87) ----------
+  // Pixelicoon 7×7: hoeken naar buiten (volledig scherm) of naar binnen (terug naar venster).
+  UI.fsGlyph = function (ctx, x, y, col, exit) {
+    const rows = exit ? ['.#...#.', '##...##', '.......', '.......', '.......', '##...##', '.#...#.']
+                      : ['##...##', '#.....#', '.......', '.......', '.......', '#.....#', '##...##'];
+    rows.forEach((r, j) => { for (let i = 0; i < 7; i++) if (r[i] === '#') R().rect(ctx, x + i, y + j, 1, 1, col); });
+  };
+  // Klein vierkant knopje (HUD) of knop met tekst (titelscherm). Klikvlak-id 'fullscreen': main.js
+  // vangt die klik direct in de muisklik af, omdat de browser fullscreen alleen binnen een gebaar toestaat.
+  UI.fsButton = function (app, ctx, x, y, withLabel) {
+    if (!app.fsAvailable) return;
+    const on = app.isFullscreen(), tip = on ? 'Terug naar venster (F)' : 'Volledig scherm (F)';
+    if (withLabel) {
+      const label = on ? 'Venster' : 'Volledig scherm', w = F().width(label) + 25, h = 13;
+      const hv = UI.btn(app, ctx, 'fullscreen', x - w, y, w, h, '', () => {}, { tone: 'wood', tip });
+      UI.fsGlyph(ctx, x - w + 6, y + 3 + (hv ? 1 : 0), hv ? P.gold2 : P.gold, on);
+      F().draw(ctx, label, x - w + 17, y + 3 + (hv ? 1 : 0), P.cream3, { shadow: P.wood1 });
+      return;
+    }
+    const hv = UI.hit(app, 'fullscreen', x - 1, y - 1, 13, 13, () => {}, tip);
+    if (hv) R().round(ctx, x - 1, y - 1, 13, 13, 3, P.wood1);
+    UI.fsGlyph(ctx, x + 2, y + 2, hv ? P.gold2 : P.stone2, on);
+  };
+
+  // Feedback als pixelicoon (tekstballon 8×7), alleen als de HTML-knop naast het beeld geen plek heeft
+  // (exact 16:9-venster of volledig scherm). Klik opent hetzelfde venster als de knop (feedback.js).
+  UI.fbGlyph = function (ctx, x, y, line, fill) {
+    const rows = ['.######.', '#......#', '#......#', '#......#', '.###.##.', '..##....', '..#.....'];
+    rows.forEach((r, j) => { for (let i = 0; i < 8; i++) if (r[i] === '#') R().rect(ctx, x + i, y + j, 1, 1, line); });
+    R().rect(ctx, x + 1, y + 1, 6, 3, fill); R().rect(ctx, x + 4, y + 4, 1, 1, fill);
+  };
+  UI.fbButton = function (app, ctx, x, y, withLabel) {
+    if (!CC.feedbackInCanvas || !CC.openFeedback) return false;
+    if (withLabel) {   // titelscherm: knop met tekst, links, als tegenhanger van "Volledig scherm"
+      const label = 'Feedback', w = F().width(label) + 26, h = 13;
+      const hb = UI.btn(app, ctx, 'feedback', x, y, w, h, '', () => CC.openFeedback(), { tone: 'wood', tip: 'Een bug, een idee, iets onduidelijks: laat het weten' });
+      UI.fbGlyph(ctx, x + 5, y + 3 + (hb ? 1 : 0), hb ? P.gold2 : P.gold, P.cream3);
+      F().draw(ctx, label, x + 17, y + 3 + (hb ? 1 : 0), P.cream3, { shadow: P.wood1 });
+      return true;
+    }
+    const hv = UI.hit(app, 'feedback', x - 1, y - 1, 13, 13, () => CC.openFeedback(), 'Feedback geven op het spel');
+    if (hv) R().round(ctx, x - 1, y - 1, 13, 13, 3, P.wood1);
+    UI.fbGlyph(ctx, x + 2, y + 2, hv ? P.gold2 : P.gold, hv ? P.cream3 : P.stone2);
+    return true;
+  };
+
   // ---------- HUD ----------
   UI.hud = function (app, ctx) {
     const s = app.s; const C = CC.CONFIG;
@@ -106,13 +152,15 @@
       const d = app.day; const frac = Math.min(1, d.t / C.dayLength);
       const mins = 9 * 60 + Math.floor(frac * 9 * 60);
       const hh = String(Math.floor(mins / 60)).padStart(2, '0'), mm = String(mins % 60 - (mins % 15)).padStart(2, '0');
-      F().draw(ctx, `${hh}:${mm}`, 470, 4, P.cream2);
-      R().rect(ctx, 502, 6, 102, 5, P.wood1);
-      R().rect(ctx, 503, 7, Math.round(100 * frac), 3, frac >= 1 ? P.bord3 : P.green3);
-      F().draw(ctx, frac >= 1 ? 'dicht' : 'open', 610, 4, frac >= 1 ? P.bord4 : P.green4);
+      F().draw(ctx, `${hh}:${mm}`, 442, 4, P.cream2);
+      R().rect(ctx, 474, 6, 102, 5, P.wood1);
+      R().rect(ctx, 475, 7, Math.round(100 * frac), 3, frac >= 1 ? P.bord3 : P.green3);
+      F().draw(ctx, frac >= 1 ? 'dicht' : 'open', 582, 4, frac >= 1 ? P.bord4 : P.green4);
     } else if (app.phase === 'prep') {
-      F().draw(ctx, 'Voorbereiden', 634, 4, P.stone2, { align: 'right' });
+      F().draw(ctx, 'Voorbereiden', CC.feedbackInCanvas ? 606 : 620, 4, P.stone2, { align: 'right' });
     }
+    UI.fsButton(app, ctx, 627, 3, false);
+    UI.fbButton(app, ctx, 613, 3);
   };
 
   // ---------- Wereld-interactie (voorbereiden) ----------
@@ -1532,6 +1580,8 @@
         UI.btn(app, ctx, 'new', 328, 312, 136, 22, 'Nieuw spel', () => app.askNewGame(), { tone: 'wood' });
       } else UI.btn(app, ctx, 'new', 252, 312, 136, 22, 'Nieuw spel', () => app.askNewGame(), { tone: 'bord' });
       UI.titleFooter(app, ctx, 344);
+      UI.fsButton(app, ctx, 634, 6, true);
+      UI.fbButton(app, ctx, 6, 6, true);
       UI.confirmNewPanel(app, ctx);
       return;
     }
@@ -1543,6 +1593,7 @@
     if (app.hasSave) { UI.btn(app, ctx, 'cont', 250, y, 140, 22, 'Doorgaan', () => app.continueGame(), { tone: 'bord' }); y += 28; }
     UI.btn(app, ctx, 'new', 250, y, 140, 22, 'Nieuw spel', () => app.askNewGame(), { tone: app.hasSave ? 'wood' : 'bord' });
     UI.titleFooter(app, ctx, 342);
+    UI.fsButton(app, ctx, 634, 6, true);
     UI.confirmNewPanel(app, ctx);
   };
 
