@@ -60,7 +60,6 @@
     // dat oogt rustiger dan nearest-neighbour, dat pixels ongelijk breed maakt (tekst!).
     canvas.style.imageRendering = devW === R.W * k ? 'pixelated' : 'auto';
     app.scale = devW / dpr / R.W;                                   // CSS-px per spelpixel
-    document.documentElement.style.setProperty('--gs', (devW / dpr / 1280).toFixed(4));   // voor HTML-vensters (feedback, spelcode)
   }
   window.addEventListener('resize', fit); fit();
   if (window.matchMedia) {   // schaal 100% ↔ 125% of ander scherm: devicePixelRatio verandert zonder resize
@@ -135,7 +134,7 @@
   window.addEventListener('keydown', e => {
     if (!e.repeat) app.actT = app.t;
     if (app.phase === 'intro') return introKey(e);
-    if (app.codeOpen) { if (e.key === 'Escape') app.closeCode(); return; }   // typen in het codevenster
+    if (app.dialog) { if (e.key === 'Escape') app.closeDialog(); return; }   // feedback- of codevenster open (typen gaat via het tekstvak)
     if (app.confirmNew) { if (e.key === 'Escape') app.confirmNew = false; if (e.key === 'Enter') app.newGame(); return; }
     if (e.key === 'F1') { e.preventDefault(); DBG.on = !DBG.on; }
     if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) { app.toggleFullscreen(); return; }
@@ -184,38 +183,65 @@
     return ok;
   };
 
-  // ---------- Spelcode (export/import) ----------
-  const box = document.getElementById('codebox');
-  app.openCode = function (mode) {
-    if (!box) return;
-    const ta = box.querySelector('textarea'), msg = box.querySelector('.msg');
-    const go = box.querySelector('.go'), cp = box.querySelector('.copy');
-    box.querySelector('h2').textContent = mode === 'export' ? 'Je spelcode' : 'Spelcode laden';
-    msg.textContent = mode === 'export' ? 'Bewaar deze code (bijvoorbeeld in een notitie). Met "Code laden" op het titelscherm zet je het spel terug.' : 'Plak hier een spelcode. Je huidige spel wordt eerst de reservekopie.';
-    const st = app.s || CC.load();
-    ta.value = mode === 'export' && st ? CC.exportCode(st) : '';
-    ta.readOnly = mode === 'export';
-    cp.style.display = mode === 'export' ? '' : 'none';
-    go.style.display = mode === 'import' ? '' : 'none';
-    box.style.display = 'flex'; app.codeOpen = mode;
-    setTimeout(() => { ta.focus(); if (mode === 'export') ta.select(); }, 0);
+  // ---------- Vensters met tekstinvoer, in de canvas (besluit 92) ----------
+  // Feedback en spelcode worden in de stijl van het spel getekend (UI.textDialog). Typen, plakken en tikken gaan
+  // via één onzichtbaar tekstvak dat precies over het tekstvak in beeld ligt; de canvas tekent de tekst zelf.
+  const tin = document.createElement('textarea');
+  tin.id = 'txtin'; tin.spellcheck = false; tin.setAttribute('autocomplete', 'off'); tin.setAttribute('aria-label', 'Tekst');
+  Object.assign(tin.style, { position: 'fixed', display: 'none', zIndex: '6', opacity: '0', resize: 'none', border: '0', padding: '0', margin: '0',
+    fontSize: '16px', lineHeight: '1', color: 'transparent', background: 'transparent', caretColor: 'transparent', outline: 'none', overflow: 'hidden' });
+  document.body.appendChild(tin);
+  app.textInput = tin;
+  tin.addEventListener('keydown', e => {
+    e.stopPropagation();   // spatie, cijfers, S, P, F ... niet naar het spel
+    if (e.key === 'Escape') { e.preventDefault(); app.closeDialog(); }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); app.dialogAction(); }
+  });
+  tin.addEventListener('input', () => { if (app.dialog && !app.dialog.busy) { app.dialog.msg = ''; app.dialog.err = false; } });
+  app.openDialog = function (d) {
+    app.dialog = Object.assign({ t0: app.t, msg: '', err: false, busy: false, done: false }, d);
+    tin.value = d.value || ''; tin.readOnly = !!d.readOnly; tin.maxLength = d.max || 200000;
+    tin.style.display = 'block';
+    setTimeout(() => { tin.focus(); if (d.readOnly) tin.select(); else tin.setSelectionRange(tin.value.length, tin.value.length); }, 0);
   };
-  app.closeCode = function () { if (box) box.style.display = 'none'; app.codeOpen = null; canvas.focus && canvas.focus(); };
-  if (box) {
-    const ta = box.querySelector('textarea'), msg = box.querySelector('.msg');
-    box.querySelector('.close').onclick = () => app.closeCode();
-    box.querySelector('.copy').onclick = () => {
-      ta.select();
-      const done = () => { msg.textContent = 'Gekopieerd.'; };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, () => { try { document.execCommand('copy'); done(); } catch (e) { /* */ } });
-      else { try { document.execCommand('copy'); done(); } catch (e) { /* */ } }
-    };
-    box.querySelector('.go').onclick = () => {
-      const st = CC.importCode(ta.value);
-      if (!st) { msg.textContent = 'Deze code klopt niet. Controleer of je hem helemaal hebt gekopieerd.'; return; }
-      app.hasSave = true; app.hasBackup = CC.hasBackup(); app.closeCode(); app.continueGame();
-    };
-  }
+  app.closeDialog = function () {
+    const d = app.dialog; app.dialog = null; app.codeOpen = null; app.feedbackOpen = false;
+    tin.style.display = 'none'; tin.blur();
+    if (d && d.onClose) d.onClose();
+  };
+  app.dialogAction = function () { const d = app.dialog; if (d && d.action && !d.busy && !d.done) d.action(tin.value); };
+  // het onzichtbare tekstvak over het tekstvak in de canvas leggen (elke frame, het venster kan schalen)
+  app.placeTextInput = function (r) {
+    const b = canvas.getBoundingClientRect(), k = b.width / R.W;
+    tin.style.left = (b.left + r.x * k) + 'px'; tin.style.top = (b.top + r.y * k) + 'px';
+    tin.style.width = Math.max(1, r.w * k) + 'px'; tin.style.height = Math.max(1, r.h * k) + 'px';
+  };
+  app.copyText = function (text) {
+    const done = () => { if (app.dialog) { app.dialog.msg = 'Gekopieerd.'; app.dialog.err = false; } };
+    const legacy = () => { try { tin.focus(); tin.select(); if (document.execCommand('copy')) done(); } catch (e) { /* */ } };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, legacy); else legacy();
+  };
+
+  // ---------- Spelcode (export/import) ----------
+  app.openCode = function (mode) {
+    const st = app.s || CC.load();
+    app.codeOpen = mode;
+    if (mode === 'export') {
+      app.openDialog({ kind: 'code', title: 'Je spelcode', readOnly: true, value: st ? CC.exportCode(st) : '',
+        info: 'Bewaar deze code (bijvoorbeeld in een notitie). Met "Code laden" op het titelscherm zet je het spel terug.',
+        actionLabel: 'Kopiëren', action: v => app.copyText(v) });
+    } else {
+      app.openDialog({ kind: 'code', title: 'Spelcode laden', value: '', placeholder: 'Plak hier je spelcode (Ctrl+V)',
+        info: 'Plak hier een spelcode. Je huidige spel wordt eerst de reservekopie.',
+        actionLabel: 'Laden', action: v => {
+          const st2 = CC.importCode(v);
+          if (!st2) { app.dialog.msg = 'Deze code klopt niet. Controleer of je hem helemaal hebt gekopieerd.'; app.dialog.err = true; return; }
+          app.hasSave = true; app.hasBackup = CC.hasBackup(); app.closeDialog(); app.continueGame();
+        } });
+    }
+    app.codeOpen = mode;
+  };
+  app.closeCode = function () { if (app.dialog && app.dialog.kind === 'code') app.closeDialog(); };
 
   // ---------- Acties ----------
   app.rebuildRoom = function () { R.roomCache = R.buildRoom(app.s ? app.s.level : 1, app.images); app.roomLevel = app.s ? app.s.level : 1; };
@@ -661,7 +687,7 @@
     }
     // simulatie
     if (app.advice) app.advice.t += dt;
-    if (app.phase === 'sale' && app.advice) { /* pauze: het kaartje is open */ }
+    if (app.phase === 'sale' && (app.advice || app.dialog)) { /* pauze: adviesvraag of feedback/codevenster open */ }
     else if (app.phase === 'sale') {
       app.day.speed = app.speed;
       app.acc += Math.min(dt, 0.1) * app.speed;
@@ -701,6 +727,7 @@
       if (app.phase === 'won') UI.endPanel(app, ctx, true);
     }
     if (CC.FX) CC.FX.drawParts(ctx, dt);   // deeltjes boven alles (muntjes, deurbel, vuurwerk)
+    if (app.dialog) UI.textDialog(app, ctx);
     DBG.draw(app, ctx);
     const h = UI.pick(app.mouse.x, app.mouse.y);
     app.hoverId = h ? h.id : null;

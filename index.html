@@ -8,22 +8,10 @@
   html, body { margin: 0; height: 100%; background: #1f0a0e; overflow: hidden; }
   body { display: flex; align-items: center; justify-content: center; }
   canvas { display: block; }   /* image-rendering zet main.js: pixelated bij exacte schaal, anders zacht verkleinen */
-  #codebox { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(31,10,14,0.7); z-index: 10; }
-  #codebox .card { transform: scale(clamp(.8, var(--gs, 1), 1.6)); width: min(520px, 90vw); background: #f3e6c8; border: 3px solid #5a3a22; outline: 2px solid #e8b53a; outline-offset: -7px; border-radius: 12px; padding: 18px 20px 16px; box-shadow: 0 6px 0 rgba(31,10,14,0.45); font: 14px/1.4 Georgia, 'Times New Roman', serif; color: #1f0a0e; }
-  #codebox h2 { margin: 0 0 6px; font-size: 18px; color: #7a1f2b; }
-  #codebox .msg { margin: 0 0 10px; color: #5a4a3a; min-height: 20px; }
-  #codebox textarea { width: 100%; box-sizing: border-box; height: 110px; resize: none; border: 2px solid #8a6a44; border-radius: 6px; background: #fdf6e3; padding: 8px; font: 12px/1.3 Consolas, monospace; color: #1f0a0e; word-break: break-all; }
-  #codebox .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
-  #codebox button { font: bold 14px Georgia, serif; padding: 6px 16px; border-radius: 8px; border: 2px solid #1f0a0e; cursor: pointer; color: #fdf6e3; background: #7a1f2b; box-shadow: 0 2px 0 #3e0f16; }
-  #codebox button.close { background: #8a6a44; box-shadow: 0 2px 0 #4a3420; }
-  #codebox button:hover { filter: brightness(1.15); }
-  body.intro #fb-btn { visibility: hidden; }   /* feedbackknop weg tijdens de intro */
 </style>
 </head>
 <body>
 <canvas id="game" width="640" height="360"></canvas>
-<div id="codebox"><div class="card"><h2>Spelcode</h2><p class="msg"></p><textarea spellcheck="false"></textarea>
-  <div class="row"><button class="close">Sluiten</button><button class="copy">Kopiëren</button><button class="go">Laden</button></div></div></div>
 <script src="src/config.js"></script>
 <script src="assets/layers.js"></script>
 <script src="assets/sprites.js"></script>

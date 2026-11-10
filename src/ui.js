@@ -1690,6 +1690,61 @@
     if (CC.INTRO && app.playIntro) { const T = CC.TEXT.intro; small('intro', T.menuBtn, () => app.playIntro(), T.menuTip); }
   };
 
+  // ---------- Venster met tekstinvoer: feedback en spelcode (besluit 92) ----------
+  // Getekend in de canvas; de tekst komt uit het onzichtbare tekstvak (app.textInput) dat over het tekstvak ligt.
+  UI.textDialog = function (app, ctx) {
+    const d = app.dialog, tin = app.textInput; if (!d || !tin) return;
+    const k = Math.min(1, (app.t - d.t0) / 0.14), ease = 1 - Math.pow(1 - k, 3);
+    R().rect(ctx, 0, 0, 640, 360, `rgba(31,10,14,${0.55 * ease})`);
+    UI.hit(app, 'dlg_dim', 0, 0, 640, 360, () => { if (!d.busy) app.closeDialog(); }, null);
+    const w = 372, x = 134;
+    const info = d.info ? F().wrap(d.info, w - 40) : [];
+    const boxH = 8 * 10 + 8, h = 46 + info.length * 10 + boxH + 44;
+    const y = Math.round(180 - h / 2 + (1 - ease) * 14);
+    if (d.done) {   // bedankt (feedback verstuurd): klein venster
+      const dw = 240, dh = 64, dx = 320 - dw / 2, dy = 180 - dh / 2;
+      R().panel(ctx, dx, dy, dw, dh);
+      HF().draw(ctx, d.doneTitle || 'Dank je wel!', 320, dy + 17, P.bord2, { align: 'center' });
+      F().draw(ctx, d.doneText || '', 320, dy + 35, P.ink, { align: 'center' });
+      app.placeTextInput({ x: 0, y: 0, w: 0, h: 0 });
+      return;
+    }
+    UI.hit(app, 'dlg_block', x, y, w, h, () => tin.focus(), null);
+    R().panel(ctx, x, y, w, h);
+    HF().draw(ctx, d.title || '', x + 16, y + 12, P.bord2);
+    UI.btn(app, ctx, 'dlg_x', x + w - 30, y + 11, 15, 13, '×', () => app.closeDialog(), { tone: 'bord', tip: 'Sluiten (Esc)' });
+    R().rect(ctx, x + 14, y + 25, w - 28, 1, P.cream1);
+    info.forEach((l, i) => F().draw(ctx, l, x + 16, y + 32 + i * 10, P.wood2));
+    // tekstvak
+    const bx = x + 16, by = y + 34 + info.length * 10 + 4, bw = w - 32;
+    const focused = document.activeElement === tin;
+    R().round(ctx, bx, by, bw, boxH, 4, focused ? P.wood2 : P.cream1);
+    R().round(ctx, bx + 1, by + 1, bw - 2, boxH - 2, 3, P.cream3);
+    app.placeTextInput({ x: bx, y: by, w: bw, h: boxH });
+    const val = tin.value, tw = bw - 12, lines = F().wrapIdx(val, tw), maxL = 8;
+    const caret = tin.selectionEnd == null ? val.length : tin.selectionEnd;
+    let cl = 0; lines.forEach((l, i) => { if (l.s <= caret) cl = i; });
+    const first = d.readOnly ? 0 : Math.max(0, Math.min(cl - maxL + 1, lines.length - maxL));
+    if (!val && d.placeholder) F().draw(ctx, d.placeholder, bx + 6, by + 5, P.stone2);
+    lines.slice(first, first + maxL).forEach((l, i) => F().draw(ctx, val.slice(l.s, l.e).replace(/\n/g, ''), bx + 6, by + 5 + i * 10, P.ink));
+    if (d.readOnly && lines.length > maxL) {   // lange spelcode: laatste regel wordt een samenvatting
+      R().rect(ctx, bx + 2, by + 5 + (maxL - 1) * 10 - 1, bw - 4, 10, P.cream3);
+      F().draw(ctx, `... (${val.length} tekens; Kopiëren neemt alles mee)`, bx + 6, by + 5 + (maxL - 1) * 10, P.stone1);
+    }
+    if (focused && !d.readOnly && (Math.floor((app.t - d.t0) * 2.2) % 2 === 0) && cl >= first && cl < first + maxL) {
+      const L = lines[cl], cx = bx + 6 + F().width(val.slice(L.s, caret).replace(/\n/g, '')) + (caret > L.s ? 1 : 0);
+      R().rect(ctx, cx, by + 4 + (cl - first) * 10, 1, 9, P.bord2);
+    }
+    // voet: melding en knoppen
+    const fy = by + boxH + 10;
+    if (d.msg) F().draw(ctx, d.msg, x + 16, fy + 4, d.err ? P.red : P.green2);
+    else if (d.count && d.max) F().draw(ctx, `${val.length} / ${d.max}`, x + 16, fy + 4, P.stone2);
+    const aw = F().width(d.actionLabel || '') + 26;
+    const disabled = d.busy || (!d.readOnly && !val.trim());
+    UI.btn(app, ctx, 'dlg_go', x + w - 16 - aw, fy, aw, 18, d.busy ? (d.busyLabel || '...') : d.actionLabel, () => app.dialogAction(), { tone: 'bord', disabled, tip: d.readOnly ? null : 'Ctrl+Enter' });
+    UI.btn(app, ctx, 'dlg_close', x + w - 24 - aw - 80, fy, 80, 18, 'Sluiten', () => app.closeDialog(), { tone: 'wood', tip: 'Esc' });
+  };
+
   // "Nieuw spel" terwijl er een lopend spel is: eerst vragen.
   UI.confirmNewPanel = function (app, ctx) {
     if (!app.confirmNew) return;

@@ -36,7 +36,7 @@ const SKIP_TIMES = [0.2, 2.5, 4.4, 6.5, 10.5, 11.7, 14, 17.5, 19.2, 21, 23];
   await fresh();
   let s = await state();
   check('eerste start: intro', s.phase === 'intro', s.phase);
-  check('feedbackknop verborgen tijdens de intro', await ev(() => getComputedStyle(document.getElementById('fb-btn')).visibility === 'hidden'));
+  check('feedbackknop niet in beeld tijdens de intro', await ev(() => !CC.UI.hits.some(h => h.id === 'feedback')));   // besluit 92: knop in de canvas
   await wait(1500);
   check('de tijd loopt', await ev(() => app.introT > 1), String(await ev(() => app.introT.toFixed(2))));
   await page.mouse.click(640, 640);   // waar straks "Nieuw spel" staat
@@ -45,7 +45,7 @@ const SKIP_TIMES = [0.2, 2.5, 4.4, 6.5, 10.5, 11.7, 14, 17.5, 19.2, 21, 23];
   check('klik: naar het titelscherm', s.phase === 'title', s.phase);
   check('klik raakt geen menuknop (geen nieuw spel, geen vraag)', !s.s && !s.hasSave && !s.confirm);
   check('vlag gezet', s.seen === true);
-  check('feedbackknop weer zichtbaar', await ev(() => getComputedStyle(document.getElementById('fb-btn')).visibility === 'visible'));
+  check('feedbackknop op het titelscherm', await ev(() => CC.UI.hits.some(h => h.id === 'feedback')));
   await page.reload(); await wait(400);
   check('herladen: direct het titelscherm', (await state()).phase === 'title');
   // "Nieuw spel" wist de vlag niet

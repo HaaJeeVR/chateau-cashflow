@@ -94,6 +94,7 @@
   g('>', [E, '#..', '.#.', '..#', '.#.', '#..']);
   g('<', [E, '..#', '.#.', '#..', '.#.', '..#']);
   g('_', [E, E, E, E, E, E, E, '#####']);
+  g('…', [E, E, E, E, E, E, '#.#.#']);
   g('&', ['.##..', '#..#.', '.##..', '.#...', '#.#.#', '#..#.', '.##.#']);
   g('#', [E, '.#.#.', '#####', '.#.#.', '#####', '.#.#.']);
   g('▶', ['#...', '##..', '###.', '####', '###.', '##..', '#...']);
@@ -222,6 +223,22 @@
           ctx.drawImage(img, gl.x, 0, gl.w, cellH, cx, y + cellTop, gl.w, cellH);
           cx += gl.w + track;
         }
+      },
+      // Afbreken met posities (voor tekstvakken met een cursor): [{s, e}] per regel, \n breekt af,
+      // lange woorden (spelcode) worden op letters gebroken. Spaties blijven aan het eind van de regel staan.
+      wrapIdx(txt, maxW) {
+        txt = String(txt); const out = []; let s = 0; const n = txt.length;
+        for (;;) {
+          let nl = txt.indexOf('\n', s); if (nl < 0) nl = n;
+          if (s === nl) { out.push({ s, e: s }); if (nl === n) break; s = nl + 1; continue; }
+          let e = s, w = 0, sp = -1;
+          while (e < nl) { const cw = this.charW(txt[e]); if (w + cw - track > maxW && e > s) break; if (txt[e] === ' ') sp = e; w += cw; e++; }
+          if (e < nl && sp >= s) e = sp + 1;
+          out.push({ s, e });
+          s = e;
+          if (s === nl) { if (nl === n) break; s = nl + 1; if (s === n) { out.push({ s, e: s }); break; } }
+        }
+        return out;
       },
       // Woordafbreking op maxW pixels.
       wrap(str, maxW) {
