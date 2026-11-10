@@ -92,6 +92,7 @@
   canvas.addEventListener('mouseleave', () => { app.mouse = { x: -1, y: -1 }; });
   canvas.addEventListener('mousedown', e => {
     if (e.button !== 0) return;
+    app.actT = app.t;   // de speler handelt: hints linksonder verdwijnen (besluit 89)
     const p = toGame(e);
     // fullscreen moet binnen de klik zelf (gebruikersgebaar), niet pas in de volgende frame
     const h = app.phase !== 'intro' && UI.pick(p.x, p.y);
@@ -132,6 +133,7 @@
   }
 
   window.addEventListener('keydown', e => {
+    if (!e.repeat) app.actT = app.t;
     if (app.phase === 'intro') return introKey(e);
     if (app.codeOpen) { if (e.key === 'Escape') app.closeCode(); return; }   // typen in het codevenster
     if (app.confirmNew) { if (e.key === 'Escape') app.confirmNew = false; if (e.key === 'Enter') app.newGame(); return; }

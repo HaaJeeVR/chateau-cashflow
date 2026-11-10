@@ -139,21 +139,29 @@
     const shown = Math.abs(s.cash - app.cashShown) < 0.01 ? s.cash : Math.round(app.cashShown);
     const cashCol = app.cashFlash ? (app.cashFlash.up ? P.green4 : P.red) : (s.cash < 0 ? P.red : P.gold2);
     F().draw(ctx, R().euro(shown), 127, 4, cashCol);
-    // aflossing (zondag)
+    // aflossing (zondag), besluit 89: "Zondag €720" en een balk die iets zegt. Beschikbaar = kas min de huur en
+    // lonen die deze week nog van de kas gaan (SIM.costsLeft), tegenover de termijn. Groen = gedekt, goud = krap
+    // (nog niet gedekt, wel binnen bereik), rood = tekort.
     const due = CC.SIM.weekDue(s);
     if (due > 0) {
-      F().draw(ctx, 'Zo', 196, 4, P.stone2);
-      const frac = Math.max(0, Math.min(1, s.cash / due));
-      R().rect(ctx, 210, 5, 52, 7, P.wood1);
-      R().rect(ctx, 211, 6, Math.round(50 * frac), 5, frac >= 1 ? P.ok : (frac > 0.6 ? P.gold : P.red));
-      F().draw(ctx, R().euro(due), 266, 4, frac >= 1 ? P.green4 : P.cream2);
-      UI.hit(app, 'hud_due', 194, 0, 110, 16, null, `Aflossing zondag: ${R().euro(due)} · nog te gaan ${R().euro(CC.SIM.debtLeft(s))}`);
+      const left = CC.SIM.costsLeft(s), avail = s.cash - left;
+      const frac = Math.max(0, Math.min(1, avail / due));
+      const col = avail >= due ? P.ok : (frac >= 0.6 ? P.gold : P.red);
+      const lbl = 'Zondag', amt = R().euro(due), lw = F().width(lbl);
+      F().draw(ctx, lbl, 196, 4, P.stone2);
+      F().draw(ctx, amt, 200 + lw, 4, avail >= due ? P.green4 : P.cream2);
+      const bx = 205 + lw + F().width(amt), bw = Math.max(24, 312 - bx);
+      R().rect(ctx, bx, 5, bw, 7, P.wood1);
+      R().rect(ctx, bx + 1, 6, Math.round((bw - 2) * frac), 5, col);
+      const tip = `Aflossing zondag: ${R().euro(due)}. Kas ${R().euro(s.cash)}` + (left > 0 ? ` min nog te betalen huur en loon deze week ${R().euro(left)} = ${R().euro(Math.round(avail))}.` : '.') +
+        (avail >= due ? ' Gedekt.' : ` Nog ${R().euro(Math.ceil(due - avail))} nodig.`) + ` Nog te gaan in totaal: ${R().euro(CC.SIM.debtLeft(s))}.`;
+      UI.hit(app, 'hud_due', 194, 0, 120, 16, null, tip);
     } else if (s.status === 'endless') F().draw(ctx, 'Schuldenvrij', 196, 4, P.green4);
     // reputatie
     const rp = CC.SIM.repProgress(s);
     F().draw(ctx, `Niv ${rp.lv}`, 318, 4, P.gold);
     R().rect(ctx, 346, 5, 42, 7, P.wood1);
-    R().rect(ctx, 347, 6, Math.round(40 * rp.frac), 5, P.bord4);
+    R().rect(ctx, 347, 6, Math.round(40 * rp.frac), 5, P.gold);   // goud: rood is alleen voor "fout" (02_ART §4)
     UI.hit(app, 'hud_rep', 316, 0, 76, 16, null, rp.next ? `Reputatie ${s.rep} · niveau ${rp.lv + 1} bij ${rp.next}` : `Reputatie ${s.rep} · hoogste niveau`);
     // opslaan mislukt: blijvende melding, klik = spelcode bewaren
     if (app.saveFailed) {
@@ -217,30 +225,34 @@
   };
 
   // ---------- Klantprognose (besluit 57) ----------
+  // Linkerkolom (besluit 89): 148 px breed, zodat de kasten op de linkerwand (vanaf x 154) met hun flessen vrij blijven.
+  const LX = 4, LW = 148;
   UI.forecastBoard = function (app, ctx) {
     const s = app.s, fc = CC.SIM.forecast(s), T = CC.TEXT;
     const order = ['buurt', 'koopjes', 'liefhebber', 'snob'].filter(k => fc.counts[k]);
-    const x = 6, y = 34, w = 190, h = 24 + order.length * 13;
+    const x = LX, y = 34, w = LW, h = 22 + order.length * 12;
     R().round(ctx, x + 2, y + 3, w, h, 6, 'rgba(31,10,14,0.35)');
     R().round(ctx, x, y, w, h, 6, P.ink);
     R().round(ctx, x + 1, y + 1, w - 2, h - 2, 5, P.wood1);
     R().round(ctx, x + 2, y + 2, w - 4, h - 4, 5, 'rgba(31,10,14,0.92)');
-    F().draw(ctx, T.forecast.title, x + 8, y + 7, P.gold);
-    const tt = T.forecast.total.split('{n}').join(fc.total), tw = F().width(tt) + 12;
-    R().pill(ctx, x + w - tw - 6, y + 5, tw, 11, P.gold, P.ink);
-    F().draw(ctx, tt, x + w - 6 - tw / 2, y + 7, P.ink, { align: 'center' });
-    let yy = y + 21;
+    F().draw(ctx, T.forecast.title, x + 7, y + 6, P.gold);
+    // totaal als compact getal in een pil; de volle tekst ("46 klanten") in de tooltip
+    const tt = String(fc.total), tw = F().width(tt) + 10;
+    R().pill(ctx, x + w - tw - 5, y + 4, tw, 11, P.gold, P.ink);
+    F().draw(ctx, tt, x + w - 5 - tw / 2, y + 6, P.ink, { align: 'center' });
+    UI.hit(app, 'fc_total', x + w - tw - 6, y + 3, tw + 2, 13, null, T.forecast.total.split('{n}').join(fc.total));
+    let yy = y + 19;
     for (const k of order) {
       const n = fc.counts[k], info = T.typeInfo[k], ct = CC.CUSTOMER_TYPES[k];
       const hv = UI.hit(app, 'fc_' + k, x + 3, yy - 2, w - 6, 12, null, `${info.many}: budget €${ct.budget[0]}-${ct.budget[1]}; ${info.want}`);
       if (hv && !s.flags.seenForecast) s.flags.seenForecast = true;
-      if (hv) R().round(ctx, x + 4, yy - 2, w - 8, 12, 3, 'rgba(232,181,58,0.18)');
-      R().round(ctx, x + 8, yy, 7, 7, 3, P.ink); R().round(ctx, x + 9, yy + 1, 5, 5, 2, ct.look.body);
-      F().draw(ctx, `${n} ${n === 1 ? info.one : info.many}`, x + 20, yy, P.cream2);
-      F().draw(ctx, `€${ct.budget[0]}-${ct.budget[1]}`, x + w - 9, yy, P.stone2, { align: 'right' });
-      yy += 13;
+      if (hv) R().round(ctx, x + 3, yy - 2, w - 6, 12, 3, 'rgba(232,181,58,0.18)');
+      R().round(ctx, x + 6, yy, 7, 7, 3, P.ink); R().round(ctx, x + 7, yy + 1, 5, 5, 2, ct.look.body);
+      F().draw(ctx, `${n} ${n === 1 ? info.one : info.many}`, x + 16, yy, P.cream2);
+      F().draw(ctx, `€${ct.budget[0]}-${ct.budget[1]}`, x + w - 6, yy, P.stone2, { align: 'right' });
+      yy += 12;
     }
-    UI.klusBoard(app, ctx, y + h + 6);
+    UI.klusBoard(app, ctx, y + h + 5);
   };
   // Ochtendlevering als melding linksonder (in plaats van de hint)
   UI.deliveryNote = function (app) {
@@ -272,15 +284,34 @@
         ctx.globalAlpha = k; R().round(ctx, ix + 75, 331, 3, 3, 1, P.gold2); ctx.globalAlpha = 1;
       }
     }
-    // hint linksonder
+    // hint linksonder: verdwijnt na de leestijd of zodra de speler iets doet (besluit 89)
     const hint = app.panel ? null : (app.emptyWarn ? CC.TEXT.hint.emptyOpen : (app.hintText() || UI.deliveryNote(app)));   // hulp gaat voor de routinemelding
-    if (hint) {
+    const ha = hint ? UI.hintAlpha(app, hint) : 0;
+    if (ha > 0) {
       const hw = Math.min(310, bx - 12);
       const lines = F().wrap(hint, hw - 10);
       const h = lines.length * 10 + 6;
+      ctx.globalAlpha = ha;
       R().round(ctx, 6, 352 - h, hw, h, 5, 'rgba(31,10,14,0.85)'); R().rect(ctx, 11, 352 - h, hw - 10, 1, P.wood2);
       lines.forEach((l, i) => F().draw(ctx, l, 10, 352 - h + 4 + i * 10, P.cream2));
+      ctx.globalAlpha = 1;
     }
+  };
+
+  // Zichtbaarheid van een hint (0..1). Per tekst en per dag: een nieuwe tekst of een nieuwe dag laat hem weer zien.
+  // Weg na de leestijd (6–14 s, naar lengte) of zodra de speler klikt of een toets indrukt (app.actT, main.js).
+  UI.hintAlpha = function (app, text) {
+    const s = app.s, key = text + '|' + app.phase + '|' + (s ? s.week + '.' + s.day : '');
+    const H = app.hintSt || (app.hintSt = {});
+    if (H.key !== key) { H.key = key; H.t0 = app.t; H.end = null; }
+    if (H.end == null) {
+      const read = Math.max(6, Math.min(14, 4 + text.length * 0.06));
+      if (app.t - H.t0 > read) H.end = H.t0 + read;
+      else if ((app.actT || 0) > H.t0 + 0.6) H.end = app.actT;   // gehandeld nadat de hint verscheen
+    }
+    const fadeIn = Math.min(1, (app.t - H.t0) / 0.25);
+    const fadeOut = H.end == null ? 1 : Math.max(0, 1 - (app.t - H.end) / 0.4);
+    return fadeIn * fadeOut;
   };
 
   UI.saleBar = function (app, ctx) {
@@ -323,6 +354,15 @@
     return Object.keys(o).reduce((a2, k2) => a2.split('{' + k2 + '}').join(o[k2]), T[ins.key]);
   };
   // Zin en tip over de volle breedte; de knop rechts op de titelregel. noTip: alleen de zin (als de ruimte krap is).
+  // Hoogte van het inzichtkader zonder te tekenen (om vooraf te kiezen tussen met en zonder tip)
+  UI.insightHeight = function (ins, w, noTip) {
+    const T = CC.TEXT.insight, txt = UI.insightText(ins); if (!txt) return 0;
+    const lines = F().wrap(txt, w - 14).slice(0, 2);
+    const tipRaw = !noTip && T.tip && T.tip[ins.key] ? T.tip[ins.key] : '';
+    const tip = ins.type ? tipRaw.split('{type}').join(CC.TEXT.typeInfo[ins.type].many.replace(/^./, c => c.toUpperCase())).split('{want}').join(CC.TEXT.typeInfo[ins.type].want) : tipRaw;
+    const tipLines = tip ? F().wrap(tip, w - 14).slice(0, 2) : [];
+    return 18 + lines.length * 10 + (tipLines.length ? tipLines.length * 10 + 2 : 0) + 3;
+  };
   UI.insightBox = function (app, ctx, ins, x, y, w, go, title, noTip) {
     const T = CC.TEXT.insight, txt = UI.insightText(ins); if (!txt) return 0;
     const lbl = ins.tab === 'prices' ? T.goPrices : T.goOrder, bw = F().width(lbl) + 12;
@@ -445,13 +485,17 @@
     // reputatie + voortgang naar het volgende niveau
     const rp = CC.SIM.repProgress(s);
     line('Reputatie', (sm.rep >= 0 ? '+' : '') + cnt(sm.rep), P.ink, P.bord2);
-    R().rect(ctx, rx, ry, rw, 4, P.cream1); R().rect(ctx, rx, ry, Math.round(rw * rp.frac), 4, P.bord4);
+    R().rect(ctx, rx, ry, rw, 4, P.cream1); R().rect(ctx, rx, ry, Math.round(rw * rp.frac), 4, P.gold); R().rect(ctx, rx, ry + 3, Math.round(rw * rp.frac), 1, "#b88a2a");   // goud, zoals in de HUD
     ry += 6;
     F().draw(ctx, rp.next ? `niveau ${rp.lv} · nog ${rp.next - Math.round(s.rep)} tot niveau ${rp.lv + 1}` : `niveau ${rp.lv} · hoogste niveau`, rx, ry, P.stone1); ry += 11;
     // waar kwam de reputatie vandaan? (besluit 76)
     const RP = sm.repParts || {}, rn = v => (v > 0 ? '+' : '') + String(Math.round(v * 10) / 10).replace('.', ',');
     const parts = [['verkoop', RP.sale], ['prestige', RP.prestige], ['advies', RP.advice], ['klus', RP.klus], ['woeker', RP.woeker]].filter(p2 => p2[1]);
-    if (parts.length) { F().draw(ctx, parts.map(p2 => `${p2[0]} ${rn(p2[1])}`).join(' · '), rx, ry, P.wood2); ry += 11; }
+    if (parts.length) {   // past het niet op één regel, dan over twee
+      const pl = parts.map(p2 => `${p2[0]} ${rn(p2[1])}`), one = pl.join(' · ');
+      const rowsP = F().width(one) <= rw ? [one] : [pl.slice(0, Math.ceil(pl.length / 2)).join(' · '), pl.slice(Math.ceil(pl.length / 2)).join(' · ')];
+      rowsP.forEach(l => { F().draw(ctx, l, rx, ry, P.wood2); ry += 10; }); ry += 1;
+    }
     ry += 3;
     for (const kd of sm.klusDone || []) {   // klus gehaald: groen vinkje
       R().round(ctx, rx, ry - 2, rw, 12, 4, '#e9f2dc');
@@ -472,8 +516,9 @@
     if (ins) {
       const go = () => { app.pendingFocus = { tab: ins.tab, wine: ins.wine || null }; app.resultT = Math.max(app.resultT, 1.25); app.afterResult(); };
       go.tip = CC.TEXT.insight.goTip;
-      const room = y + H - 10 - ry - (nShop ? 18 + nShop * 11 : 0) - (nStaff ? 14 + nStaff * 20 : 0);
-      ry += UI.insightBox(app, ctx, ins, rx, ry, rw, go, null, room < 58) + 8;
+      // ruimte die er na het kader nog nodig is: precies wat "Je winkel" en "Personeel" hieronder innemen
+      const room = y + H - 9 - ry - 8 - (nShop ? 18 + nShop * 11 : 0) - (nStaff ? 14 + nStaff * 21 : 0);
+      ry += UI.insightBox(app, ctx, ins, rx, ry, rw, go, null, UI.insightHeight(ins, rw, false) > room) + 8;
     }
 
     // je winkel: investeringen
@@ -489,6 +534,8 @@
 
     // personeel: wat deed wie, en XP
     const ids = Object.keys(work);
+    // te weinig ruimte over (drukke dag)? Dan per medewerker één regel met een dun XP-balkje eronder.
+    const tightStaff = ids.length && (y + H - 9 - ry) < 14 + ids.length * 21;
     if (ids.length) {
       head('Personeel');
       for (const id of ids) {
@@ -500,7 +547,13 @@
         R().pill(ctx, rx + rw - pw, ry - 2, pw, 11, w.xp > 0 ? P.gold : P.cream1, P.ink);
         F().draw(ctx, xp, rx + rw - pw / 2, ry, P.ink, { align: 'center' });
         ry += 12;
-        if (st) {   // XP-balk naar het volgende level
+        if (st && tightStaff) {   // compact: alleen een dun balkje, het level staat in de tooltip
+          const next = CC.SIM.staffNext(s, id), Lx = CC.CONFIG.staffXp, a = Lx[st.level - 1];
+          const f = next == null ? 1 : Math.max(0, Math.min(1, (st.xp - a) / (next - a)));
+          R().rect(ctx, rx, ry - 2, rw - pw - 6, 1, P.cream1); R().rect(ctx, rx, ry - 2, Math.round((rw - pw - 6) * f), 1, P.gold);
+          UI.hit(app, 'res_xp_' + id, rx, ry - 14, rw, 13, null, next == null ? `level ${st.level} · max` : `level ${st.level} · ${Math.floor(st.xp)}/${next} XP`);
+          ry += 1;
+        } else if (st) {   // XP-balk naar het volgende level
           const next = CC.SIM.staffNext(s, id), Lx = CC.CONFIG.staffXp, a = Lx[st.level - 1];
           const f = next == null ? 1 : Math.max(0, Math.min(1, (st.xp - a) / (next - a)));
           const lt = next == null ? `level ${st.level} · max` : `level ${st.level} · ${Math.floor(st.xp)}/${next} XP`, lw = rw - F().width(lt) - 8;
@@ -691,7 +744,7 @@
   UI.firstDayList = function (app, ctx, y) {
     const s = app.s, f = s.flags, T = CC.TEXT.tutorial;
     const items = [['forecast', f.seenForecast], ['order', f.bought], ['prices', f.priced || f.pricesSeen], ['open', f.opened]];
-    const x = 6, w = 190, h = 18 + items.length * 13;
+    const x = LX, w = LW, h = 18 + items.length * 13;
     R().round(ctx, x + 2, y + 3, w, h, 6, 'rgba(31,10,14,0.35)');
     R().round(ctx, x, y, w, h, 6, P.ink); R().round(ctx, x + 1, y + 1, w - 2, h - 2, 5, P.gold); R().round(ctx, x + 2, y + 2, w - 4, h - 4, 5, 'rgba(31,10,14,0.92)');
     F().draw(ctx, T.listTitle, x + 8, y + 6, P.gold);
@@ -712,7 +765,7 @@
     const s = app.s;
     if (!s.flags.opened) return UI.firstDayList(app, ctx, y);   // eerste dag: eerst de checklist
     const open = CC.SIM.klusOpen(s).slice(0, 2); if (!open.length) return;
-    const x = 6, w = 190, h = 14 + open.length * 22;
+    const x = LX, w = LW, h = 14 + open.length * 22;
     R().round(ctx, x + 2, y + 3, w, h, 6, 'rgba(31,10,14,0.35)');
     R().round(ctx, x, y, w, h, 6, P.ink); R().round(ctx, x + 1, y + 1, w - 2, h - 2, 5, P.wood1); R().round(ctx, x + 2, y + 2, w - 4, h - 4, 5, 'rgba(31,10,14,0.92)');
     F().draw(ctx, CC.SIM.klusOpen(s).length > 1 ? 'Klussen' : 'Klus', x + 8, y + 6, P.gold);
@@ -1115,10 +1168,14 @@
     const asking = !app.s.flags.advised && app.day.customers.some(c => c.state === 'ask');
     const first = app.s.week === 1 && app.s.day === 0;
     if (!asking && !first) return;
-    const lines = F().wrap(asking ? 'Een klant met een ! heeft een vraag. Klik op hem: het spel pauzeert en jij raadt een wijn aan.' : CC.TEXT.tutorial.firstSale, 300);
+    const text = asking ? 'Een klant met een ! heeft een vraag. Klik op hem: het spel pauzeert en jij raadt een wijn aan.' : CC.TEXT.tutorial.firstSale;
+    const ha = UI.hintAlpha(app, text); if (ha <= 0) return;
+    const lines = F().wrap(text, 300);
     const h = lines.length * 10 + 6;
+    ctx.globalAlpha = ha;
     R().round(ctx, 6, 352 - h, 310, h, 5, 'rgba(31,10,14,0.85)'); R().rect(ctx, 11, 352 - h, 300, 1, P.gold);
     lines.forEach((l, i) => F().draw(ctx, l, 10, 352 - h + 4 + i * 10, P.gold2));
+    ctx.globalAlpha = 1;
   };
 
   // ---------- Weekkaarten (01_ONTWERP §10, besluit 58: echte kaarten) ----------
