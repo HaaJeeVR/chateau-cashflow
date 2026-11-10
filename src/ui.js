@@ -1681,7 +1681,7 @@
 
   // Onderste regel van het titelscherm: versie links, spelcode en reservekopie rechts (klein, rustig).
   UI.titleFooter = function (app, ctx, y) {
-    F().draw(ctx, 'Versie ' + CC.VERSION + ' · F1 = debug', 10, y + 3, P.stone1);
+    if (CC.DBG && CC.DBG.allowed) F().draw(ctx, 'Versie ' + CC.VERSION + ' · F1 = debug', 10, y + 3, P.stone1);   // alleen met ?debug (besluit 93)
     let bx = 634;
     const small = (id, label, fn, tip) => { const w = F().width(label) + 14; bx -= w; UI.btn(app, ctx, id, bx, y, w, 13, label, fn, { tone: 'wood', tip }); bx -= 4; };
     small('code_in', 'Code laden', () => app.openCode('import'), 'Een spel inladen vanaf een spelcode');

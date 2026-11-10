@@ -124,7 +124,7 @@
   function introKey(e) {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;           // sneltoetsen van de browser, Alt-Tab
     if (['Shift', 'Control', 'Alt', 'Meta', 'Tab', 'CapsLock', 'F5', 'F11', 'F12'].includes(e.key)) return;
-    if (e.key === 'F1') { e.preventDefault(); DBG.on = !DBG.on; return; }
+    if (e.key === 'F1') { e.preventDefault(); DBG.toggle(); return; }
     if (app.introPause && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault(); app.introT = Math.max(0, app.introT + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : 0.1)); return;
     }
@@ -136,7 +136,7 @@
     if (app.phase === 'intro') return introKey(e);
     if (app.dialog) { if (e.key === 'Escape') app.closeDialog(); return; }   // feedback- of codevenster open (typen gaat via het tekstvak)
     if (app.confirmNew) { if (e.key === 'Escape') app.confirmNew = false; if (e.key === 'Enter') app.newGame(); return; }
-    if (e.key === 'F1') { e.preventDefault(); DBG.on = !DBG.on; }
+    if (e.key === 'F1') { e.preventDefault(); DBG.toggle(); }
     if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) { app.toggleFullscreen(); return; }
     if (app.advice) {
       const A = app.advice;

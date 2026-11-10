@@ -1,8 +1,12 @@
-// Château Cashflow — debug.js  (F1)
+// Château Cashflow — debug.js  (F1, alleen met ?debug in de adresbalk, ook bij file://; besluit 93)
 (function (root) {
   const CC = root.CC = root.CC || {};
   const P = CC.PAL;
-  const DBG = { on: false, log: false, fps: 0, _acc: 0, _n: 0 };
+  let allowed = false;
+  try { allowed = new URLSearchParams(root.location ? root.location.search : '').has('debug'); } catch (e) { /* */ }
+  const DBG = { allowed, on: false, log: false, fps: 0, _acc: 0, _n: 0 };
+  // F1: aan/uit, maar alleen als het debugpaneel is toegestaan (de openbare versie geeft dus geen +€500)
+  DBG.toggle = function () { if (DBG.allowed) DBG.on = !DBG.on; };
 
   DBG.tick = function (dt) {
     DBG._acc += dt; DBG._n++;
@@ -10,6 +14,7 @@
   };
 
   DBG.draw = function (app, ctx) {
+    if (!DBG.allowed) return;
     const UI = CC.UI, R = CC.R, F = CC.FONT;
     if (DBG.log && app.phase === 'sale' && app.day) {
       const rows = app.day.decisions.slice(-7);

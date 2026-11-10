@@ -62,6 +62,8 @@ Chateau Cashflow/
 
 ## 2. Debugpaneel (F1)
 
+Alleen actief met `?debug` in de adresbalk (ook bij dubbelklikken: `index.html?debug`), zodat de openbare versie geen +€500 geeft (besluit 93). Met `?debug` staat ook de versie weer linksonder op het titelscherm.
+
 Vanaf M0 aanwezig, want het maakt testen tien keer sneller:
 - +€500 / −€500, +50 reputatie, naar level X;
 - dag overslaan, naar zondag, naar week X;
