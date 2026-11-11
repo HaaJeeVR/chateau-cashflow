@@ -2,7 +2,15 @@
 # Bron: art_bronnen/personages/<naam>_<voor|achter>.png  óf  <naam>.png met twee figuren naast elkaar (links voor, rechts achter).
 #       <naam> = type met eventueel een nummer voor een variant (buurt2, snob2). Een blad <naam>.png gaat vóór losse _voor/_achter.
 # Uitvoer: assets/chr_<naam>_<front|back>.png + sprites.js (CC.SPRITES en CC.SPRITE_VARIANTS: type → namen)
-import os, json
+#
+# Loopbeelden (besluit 96): assets/chr_<naam>_<front|back>_walk2.png en _walk3.png worden met de hand gemaakt
+# uit het staande beeld (zelfde maat, zelfde voetlijn). Dit script maakt of wijzigt ze nooit, zet ze wel in het
+# manifest (views front_walk2 enz.), en laat het staande beeld staan als er loopbeelden bij horen: een nieuw
+# staand beeld zou niet meer passen op de loopbeelden. Opnieuw maken van zo'n staand beeld: --forceer (en
+# daarna de loopbeelden opnieuw maken).
+#   python3 tools/build_sprites.py                 alles uit art_bronnen/personages
+#   python3 tools/build_sprites.py --manifest      alleen sprites.js opnieuw schrijven uit wat er in assets/ staat
+import os, json, sys, re
 import numpy as np
 from PIL import Image
 from scipy import ndimage
@@ -48,6 +56,45 @@ def split_sheet(im):
     cut = lo + int(np.argmin(cols[lo:hi]))
     return im.crop((0, 0, cut, im.height)), im.crop((cut, 0, W_, im.height))
 
+FORCE = '--forceer' in sys.argv
+ONLY_MANIFEST = '--manifest' in sys.argv
+WALKS = ('walk2', 'walk3')
+
+def walk_files(name, v):
+    return [os.path.join(OUT, f"chr_{name}_{v}_{w}.png") for w in WALKS]
+
+def has_walks(name, v):
+    return all(os.path.exists(f) for f in walk_files(name, v))
+
+def add_walks(meta):
+    """Loopbeelden die naast een staand beeld in assets/ staan in het manifest opnemen (alleen als ze er allebei zijn)."""
+    for name in list(meta):
+        for v in ('front', 'back'):
+            if v in meta[name] and has_walks(name, v):
+                for w, f in zip(WALKS, walk_files(name, v)):
+                    im = Image.open(f)
+                    if im.size != (meta[name][v]['w'], meta[name][v]['h']):
+                        print(f"LET OP: {os.path.basename(f)} is {im.size}, staand beeld {meta[name][v]['w']}x{meta[name][v]['h']}: niet opgenomen"); break
+                    meta[name][f"{v}_{w}"] = {'src': 'assets/' + os.path.basename(f), 'w': im.width, 'h': im.height}
+
+def write_manifest(meta, variants):
+    add_walks(meta)
+    open(os.path.join(OUT, 'sprites.js'), 'w').write('// gegenereerd door tools/build_sprites.py\n(window.CC = window.CC || {}).SPRITES = ' + json.dumps(meta)
+        + ';\nCC.SPRITE_VARIANTS = ' + json.dumps(variants) + ';\n')
+
+if ONLY_MANIFEST:   # manifest uit assets/: staande beelden chr_<naam>_<front|back>.png (+ loopbeelden)
+    meta, variants = {}, {}
+    for fn in sorted(os.listdir(OUT)):
+        m = re.fullmatch(r'chr_([a-z]+\d*)_(front|back)\.png', fn)
+        if not m: continue
+        name, v = m.groups(); im = Image.open(os.path.join(OUT, fn))
+        meta.setdefault(name, {})[v] = {'src': 'assets/' + fn, 'w': im.width, 'h': im.height}
+    for name in sorted(meta):
+        variants.setdefault(re.sub(r'\d+$', '', name), []).append(name)
+    write_manifest(meta, variants)
+    print('manifest:', {k: sorted(v) for k, v in meta.items()})
+    sys.exit(0)
+
 sources = {}   # naam -> {'voor': Image, 'achter': Image}
 files = sorted(f for f in os.listdir(SRC) if f.endswith('.png'))
 sheets = {f[:-4] for f in files if '_' not in f}
@@ -65,11 +112,14 @@ meta, variants = {}, {}
 for name, views in sorted(sources.items()):
     typ = re.sub(r'\d+$', '', name)
     for view, im in views.items():
-        out = to_game(im, typ)
         v = 'front' if view == 'voor' else 'back'
-        fn = f"chr_{name}_{v}.png"; out.save(os.path.join(OUT, fn))
+        fn = f"chr_{name}_{v}.png"
+        if has_walks(name, v) and not FORCE and os.path.exists(os.path.join(OUT, fn)):
+            out = Image.open(os.path.join(OUT, fn))   # loopbeelden horen bij dit staande beeld: niet opnieuw maken
+            print(f"{fn}: blijft staan (heeft loopbeelden; --forceer om toch opnieuw te maken)")
+        else:
+            out = to_game(im, typ); out.save(os.path.join(OUT, fn))
         meta.setdefault(name, {})[v] = {'src': 'assets/' + fn, 'w': out.width, 'h': out.height}
     variants.setdefault(typ, []).append(name)
-open(os.path.join(OUT, 'sprites.js'), 'w').write('// gegenereerd door tools/build_sprites.py\n(window.CC = window.CC || {}).SPRITES = ' + json.dumps(meta)
-    + ';\nCC.SPRITE_VARIANTS = ' + json.dumps(variants) + ';\n')
+write_manifest(meta, variants)
 print(json.dumps(variants), {k: {v: f"{d['w']}x{d['h']}" for v, d in m.items()} for k, m in meta.items() if k[-1].isdigit() or k == 'liefhebber'})

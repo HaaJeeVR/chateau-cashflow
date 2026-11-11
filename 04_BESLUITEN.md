@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-11-11 — Pakket B
+
+| # | Besluit | Reden |
+|---|---|---|
+| 96 | **Loopanimatie voor alle figuren (B1).** Per figuur en aanzicht twee stapposes, `assets/chr_<naam>_<front|back>_walk2.png` en `_walk3.png` (52 beelden, met de hand gemaakt uit het staande beeld: zelfde maat, zelfde voetlijn). Ze staan in het sprite-manifest als views `front_walk2` enz. en worden geladen zoals de andere beelden. `R.drawCustomerSprite`: zolang een figuur loopt de reeks walk2 · staand · walk3 · staand, zonder de oude wip van 1 px; stilstaan = het staande beeld. Het tempo hangt aan de afgelegde weg (`walkPhase` +2 per tegel, `R.WALK_RATE` = 1,4 beeld per eenheid ≈ 0,7 m per pas, ± 2 passen per seconde op 1×), dus op 2× en 4× en voor de snellere Sem loopt het vanzelf mee zonder glijden. Geldt voor klanten, personeel en voorbijgangers; de portretjes in de vensters blijven het staande beeld. Ontbreekt een loopbeeld, is het niet geladen of heeft het een andere maat, dan precies het oude gedrag. `tools/build_sprites.py` maakt of wijzigt de loopbeelden nooit, zet ze wel in het manifest, en laat een staand beeld met loopbeelden staan (anders passen ze niet meer; `--forceer` om toch te herbouwen); `--manifest` schrijft alleen `sprites.js` uit wat er in `assets/` staat. Vervangt de haak met `_stap1`/`_stap2` uit `08_ART_PAKKET_B.md` §K. | Figuren schoven over de vloer. Met twee stapposes en het staande beeld ertussen stappen ze, zonder nieuwe gegenereerde art. |
+
+---
+
 ## 2026-11-10 — Polish-ronde (handoff Fable, pakket A)
 
 Review door Fable op de GitHub-versie van 30-09; uitgevoerd op de lokale map. Geen spelregels, balans of teksten veranderd.

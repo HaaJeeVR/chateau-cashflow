@@ -781,15 +781,27 @@
     const h = (c.id * 2654435761) >>> 0;
     return [(h % 11) - 5, ((h >>> 8) % 5) - 2];   // −5..5 px opzij, −2..2 px diepte
   };
+  // Loopanimatie (besluit 96): walk2 · staand · walk3 · staand, aan de afgelegde weg gekoppeld (walkPhase groeit
+  // met 2 per tegel). 1,4 beeld per eenheid = ± 0,7 m per pas: bij 1,5 tegel/s ± 2 passen per seconde, dus de
+  // voet glijdt niet en op 2× en 4× loopt het tempo vanzelf mee.
+  R.WALK_RATE = 1.4;
+  const ready = im => im && im.complete && im.naturalWidth;
   R.drawCustomerSprite = function (ctx, c, images) {
     const view = c.toward ? 'front' : 'back';
     const look = c.sprite || c.type;
-    const img = images['chr_' + look + '_' + view];
-    if (!img || !img.complete || !img.naturalWidth) return null;
+    const key = 'chr_' + look + '_' + view, stand = images[key];
+    if (!ready(stand)) return null;
     const [sx0, sy00] = R.iso(c.x, c.y);
     // vaste kleine verschuiving per klant (alleen beeld, niet in de sim): wie op dezelfde plek staat wordt geen kluit (besluit 90)
     const [ox, oy] = R.crowdOffset(c), sx = sx0 + ox, sy0 = sy00 + oy;
-    const step = c.moving ? (Math.floor(c.walkPhase * 3) % 2) : 0;
+    let img = stand, step = c.moving ? (Math.floor(c.walkPhase * 3) % 2) : 0;   // zonder loopbeelden: 1 px wip, zoals voorheen
+    const w2 = images[key + '_walk2'], w3 = images[key + '_walk3'];
+    if (c.moving && ready(w2) && ready(w3) && w2.naturalWidth === stand.naturalWidth && w2.naturalHeight === stand.naturalHeight &&
+        w3.naturalWidth === stand.naturalWidth && w3.naturalHeight === stand.naturalHeight) {
+      const f = Math.floor((c.walkPhase || 0) * R.WALK_RATE) % 4;
+      img = f === 0 ? w2 : f === 2 ? w3 : stand;
+      step = 0;   // de benen doen het werk; geen wip, zodat niemand opspringt bij de wissel
+    }
     const w = img.naturalWidth, h = img.naturalHeight;
     const native = (CC.SPRITE_FACING[look] || CC.SPRITE_FACING[c.type] || {})[view] || -1;
     const flip = (c.face || -1) !== native;
