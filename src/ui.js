@@ -1526,7 +1526,7 @@
       else F().draw(ctx, 'CHÂTEAU CASHFLOW', CC.TITLE.logoX, 70, P.gold2, { align: 'center', scale: 3 });
       R().rect(ctx, 0, 286, 640, 74, 'rgba(31,10,14,0.72)');
       R().rect(ctx, 0, 286, 640, 1, P.wood2);
-      F().draw(ctx, 'Eén wijnhandel. Eén lening. Acht weken.', 320, 294, P.cream2, { align: 'center', shadow: P.ink });
+      F().draw(ctx, CC.TEXT.tagline, 320, 294, P.cream2, { align: 'center', shadow: P.ink });
       if (app.hasSave) {
         UI.btn(app, ctx, 'cont', 176, 312, 136, 22, 'Doorgaan', () => app.continueGame(), { tone: 'bord' });
         UI.btn(app, ctx, 'new', 328, 312, 136, 22, 'Nieuw spel', () => app.askNewGame(), { tone: 'wood' });
@@ -1538,7 +1538,7 @@
     R().rect(ctx, 0, 0, 640, 360, 'rgba(31,10,14,0.62)');
     if (logo && logo.complete && logo.naturalWidth) ctx.drawImage(logo, Math.round(320 - logo.naturalWidth / 2), 40 + b);
     else F().draw(ctx, 'CHÂTEAU CASHFLOW', 320, 90, P.gold2, { align: 'center', scale: 3 });
-    F().draw(ctx, 'Eén wijnhandel. Eén lening. Acht weken.', 320, 172, P.cream2, { align: 'center' });
+    F().draw(ctx, CC.TEXT.tagline, 320, 172, P.cream2, { align: 'center' });
     let y = 200;
     if (app.hasSave) { UI.btn(app, ctx, 'cont', 250, y, 140, 22, 'Doorgaan', () => app.continueGame(), { tone: 'bord' }); y += 28; }
     UI.btn(app, ctx, 'new', 250, y, 140, 22, 'Nieuw spel', () => app.askNewGame(), { tone: app.hasSave ? 'wood' : 'bord' });
@@ -1554,6 +1554,7 @@
     small('code_in', 'Code laden', () => app.openCode('import'), 'Een spel inladen vanaf een spelcode');
     if (app.hasSave) small('code_out', 'Spelcode', () => app.openCode('export'), 'Je spel als tekstcode bewaren of meenemen');
     if (app.hasBackup) { const b = CC.backupInfo(); small('backup', 'Reservekopie terugzetten', () => app.restoreBackup(), b ? `Het vorige spel (week ${b.week}, niveau ${b.level}) terugzetten; het huidige wordt dan de reservekopie` : null); }
+    if (CC.INTRO && app.playIntro) { const T = CC.TEXT.intro; small('intro', T.menuBtn, () => app.playIntro(), T.menuTip); }
   };
 
   // "Nieuw spel" terwijl er een lopend spel is: eerst vragen.

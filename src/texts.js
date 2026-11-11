@@ -55,6 +55,40 @@
       firstReport: 'Reputatie verdien je met elke verkoop, dure wijn telt dubbel en goed advies telt mee. Genoeg reputatie is een nieuw niveau: meer klanten en nieuwe wijnen.',
       firstSale: 'Elke klant zoekt één soort wijn die bij hem past en binnen zijn budget valt. Is hij op of te duur, dan loopt hij weg.',
     },
+    tagline: 'Eén wijnhandel. Eén lening. Acht weken.',
+    // Intro bij de eerste start (besluit 86, src/intro.js). Droog, geen uitroeptekens.
+    intro: {
+      place: 'Utrecht, maandag, 07:12',
+      board: 'TE KOOP',
+      boardSub: 'ook geschikt als kantoor',
+      bankFirst: 'De bank was er eerder.',
+      lastLine: 'Nu alleen nog klanten.',
+      click: 'klik',
+      skip: 'Klik om over te slaan',
+      start: 'Klik om te beginnen',
+      menuBtn: 'Intro',
+      menuTip: 'De intro opnieuw afspelen',
+      letter: {
+        bank: 'J.P. MORGENSTOND & CO.',
+        since: 'Bankiers sinds 1891',
+        place: 'Utrecht, maandag',
+        re: 'Betreft: uw financieringsverzoek',
+        salute: 'Geachte heer, mevrouw,',
+        verdict: 'Financieringsverzoek gehonoreerd.',
+        term: 'Looptijd', termVal: '{n} weken',
+        when: 'Aflossing', whenVal: 'elke zondag',
+        first: 'Eerste termijn', last: 'Laatste termijn',
+        wish: '',   // leeg: de succeswens staat in de kleine lettertjes
+        greet: 'Met vriendelijke groet,',
+        name: 'B. Montenegro', role: 'accountmanager',
+        stamp: 'GEHONOREERD',
+        // kleine lettertjes onderaan de brief (keuze HJ): één regel per punt, lange regels lopen vanzelf door
+        small: [
+          'Let op: geld lenen kost geld. Wijn ook.',
+          'Wij wensen u veel succes. Wij hebben ook een afdeling Bijzonder Beheer.',
+        ],
+      },
+    },
     hint: {
       emptyShop: 'Je schappen zijn leeg. Bel eerst de leverancier (telefoon) en zet wijn in een schapvak.',
       firstDay: 'Klik op de telefoon om wijn te bestellen.',

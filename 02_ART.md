@@ -399,3 +399,37 @@ Bewerkingen van het goedgekeurde beeld:
 - `voor_2`: `Same image, identical in every detail, only the pedals and her legs are in the opposite position (the other foot down).`
 - `achter_1`: `Same woman on the same bike, seen from behind, riding diagonally away from the viewer towards the back-right. Same style, scale and colours, magenta background.`
 - `achter_2`: bewerking van `achter_1`, zelfde zin als bij `voor_2`.
+
+### Prompt J — intro (besluit 86): stijlregels en beelden
+
+De intro gebruikt dezelfde regels als de rest: 640 × 360, alleen hele schaalfactoren, nooit inzoomen (een close-up is een eigen beeld op ware grootte, zoals een kaartillustratie), sprites op ware grootte, UI en tekst in `CC.PAL` en het eigen pixelfont. Ochtend en nacht zijn kleurcorrecties van de bestaande achtergronden, gemaakt door `tools/build_intro.py` (64 kleuren, geen dithering; de lucht krijgt geditherde banden). Overgangen gaan met ordered dither, niet met overvloeien.
+
+Nu door de code of de tool gemaakt, later te vervangen:
+
+| Beeld | Nu | Vervangen door |
+|---|---|---|
+| Gevel in de ochtend, leeg pand (shot 1) | `title_bg.png` + kalk op de ruiten + kleurcorrectie | Prompt J1 → `art_bronnen/intro_gevel_bron.png` |
+| Sleutel in het slot, 160 × 80 (shot 4) | Placeholder in `src/intro.js` | Prompt J2 → `art_bronnen/intro_sleutel_bron.png` + `intro_sleutel_gedraaid_bron.png` |
+
+Na het opslaan van een bron: `python tools/build_intro.py`. Het TE KOOP-bord, de regen en het woordje "klik" tekent de code er altijd overheen.
+
+**Prompt J1 — gevel in de ochtend** (bewerking van `art_bronnen/titel_bron.png`; die meesturen):
+
+```
+Same image, identical composition, camera and every detail, but early morning just before sunrise in
+light drizzle: cool blue-grey light, wet shiny cobblestones, the street lamps still on. The wine shop is
+empty and vacant: every shop window whitewashed from the inside with swirly white chalk paint, a few thin
+uneven spots near the edges, no light inside, the three lamps above the shop sign off. The sign board
+stays blank. No people, no text or letters anywhere.
+```
+
+**Prompt J2 — sleutel** (een kaartillustratie meesturen als stijlreferentie, bijv. `assets/card_kassa.png` vergroot):
+
+```
+Pixel-art illustration in exactly the same style, palette and pixel size as the attached card
+illustration. Close-up of a brass key in the brass lock plate of a dark green painted wooden shop door of
+an old Dutch canal house; on the right a narrow strip of stone door frame and brick wall. Early morning,
+cool light, a few raindrops on the paint. Wide 2:1 composition, no hands, no text.
+```
+
+Daarna als bewerking: `Same image, identical in every detail, only the key has turned a quarter turn: its bow now stands vertical.` → `intro_sleutel_gedraaid_bron.png`.

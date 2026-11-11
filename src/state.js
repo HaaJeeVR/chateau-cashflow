@@ -110,5 +110,17 @@
   };
   CC.clearSave = function () { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* */ } };
 
+  // Instellingen die los staan van het spel (besluit 86): blijven staan bij "Nieuw spel", "Opnieuw beginnen" en spelcodes.
+  // Nu alleen: introSeen (de intro is al eens gezien of overgeslagen).
+  const SETTINGS_KEY = 'chateau-cashflow-instellingen';
+  const memSettings = {};   // als localStorage geblokkeerd is: onthouden zolang de pagina open is
+  CC.getSetting = function (k) {
+    try { const o = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); return k in o ? o[k] : memSettings[k]; } catch (e) { return memSettings[k]; }
+  };
+  CC.setSetting = function (k, v) {
+    memSettings[k] = v;
+    try { const o = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); o[k] = v; localStorage.setItem(SETTINGS_KEY, JSON.stringify(o)); return true; } catch (e) { return false; }
+  };
+
   if (typeof module !== 'undefined') module.exports = CC;
 })(typeof window !== 'undefined' ? window : globalThis);

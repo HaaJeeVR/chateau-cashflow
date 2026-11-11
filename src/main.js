@@ -32,6 +32,7 @@
   if (CC.TILES) for (const k in CC.TILES) loadImg('tile_' + k, CC.TILES[k].src);
   if (CC.ICONS) for (const k in CC.ICONS) loadImg('icon_' + k, CC.ICONS[k].src);
   if (CC.DECOR_TILES) for (const lv in CC.DECOR_TILES) loadImg('tile_decor' + lv, CC.DECOR_TILES[lv]);
+  if (CC.INTRO_ART) for (const k in CC.INTRO_ART) loadImg('intro_' + k, CC.INTRO_ART[k].src);
   CC.IMAGES = app.images;
   const logoSign = new Image(); logoSign.onload = () => { R.roomCache = null; }; logoSign.src = 'assets/logo_sign.png'; app.images.logoSign = logoSign;
 
@@ -52,7 +53,41 @@
   canvas.addEventListener('mousemove', e => { app.mouse = toGame(e); });
   canvas.addEventListener('mouseleave', () => { app.mouse = { x: -1, y: -1 }; });
   canvas.addEventListener('mousedown', e => { if (e.button === 0) app.click = toGame(e); });
+
+  // ---------- Intro (besluit 86): bij de eerste start, vóór het titelscherm ----------
+  // Speelt één keer (vlag in de instellingen, niet in de spelsave); klik, toets of tik slaat over; "Intro" in het menu speelt hem opnieuw.
+  // Testen: index.html?intro speelt hem altijd; index.html?intro=12.5 staat stil op 12,5 s, met ← → (Shift = 1 s) scrub je.
+  const qs = new URLSearchParams(location.search);
+  const introParam = qs.has('intro') ? qs.get('intro') : null;
+  app.reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  app.playIntro = function (at, pause) {
+    if (!CC.INTRO) return;
+    app.phase = 'intro'; app.phaseT = 0; app.panel = null; app.confirmNew = false; app.click = null;
+    app.introT = at || 0; app.introPause = !!pause; app.introWait = 0;
+  };
+  app.endIntro = function (notSeen) {
+    if (!notSeen) CC.setSetting('introSeen', true);   // niet bij laadproblemen: dan volgende keer opnieuw proberen
+    app.click = null; app.introPause = false;
+    app.setPhase('title');
+  };
+  if (CC.INTRO && (introParam !== null || !CC.getSetting('introSeen'))) {
+    const at = introParam ? parseFloat(introParam) : NaN;
+    app.playIntro(isFinite(at) ? at : 0, isFinite(at));
+  }
+  // Tik op een touchscreen: direct overslaan, en geen nagebootste muisklik die daarna een menuknop raakt.
+  canvas.addEventListener('touchstart', e => { if (app.phase === 'intro') { e.preventDefault(); app.endIntro(); } }, { passive: false });
+  function introKey(e) {
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;           // sneltoetsen van de browser, Alt-Tab
+    if (['Shift', 'Control', 'Alt', 'Meta', 'Tab', 'CapsLock', 'F5', 'F11', 'F12'].includes(e.key)) return;
+    if (e.key === 'F1') { e.preventDefault(); DBG.on = !DBG.on; return; }
+    if (app.introPause && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault(); app.introT = Math.max(0, app.introT + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : 0.1)); return;
+    }
+    e.preventDefault(); app.endIntro();
+  }
+
   window.addEventListener('keydown', e => {
+    if (app.phase === 'intro') return introKey(e);
     if (app.codeOpen) { if (e.key === 'Escape') app.closeCode(); return; }   // typen in het codevenster
     if (app.confirmNew) { if (e.key === 'Escape') app.confirmNew = false; if (e.key === 'Enter') app.newGame(); return; }
     if (e.key === 'F1') { e.preventDefault(); DBG.on = !DBG.on; }
@@ -522,15 +557,42 @@
     }
   }
 
+  // Intro-frame: alles komt uit CC.INTRO.renderAt(t); klik = overslaan (of: beginnen, als hij klaar is).
+  function introFrame(dt) {
+    UI.hits = [];
+    const st = CC.INTRO.status(app.images);
+    if (st === 'fail') { app.endIntro(true); return false; }   // een beeld laadt niet: gewoon naar het titelscherm
+    if (st !== 'ok' || !CC.INTRO.ready(app.images)) {          // nog aan het laden: zwart, en na 8 s opgeven
+      R.rect(ctx, 0, 0, R.W, R.H, P.ink);
+      app.introWait = (app.introWait || 0) + dt;
+      if (app.introWait > 8) { app.endIntro(true); return false; }
+      return true;
+    }
+    if (!app.introPause) app.introT += dt;
+    CC.INTRO.renderAt(ctx, app.introT, { reduced: app.reducedMotion });
+    if (app.introPause) F.draw(ctx, 'intro ' + app.introT.toFixed(2) + ' s  (◀ ▶ scrubben, Shift = 1 s)', 6, 4, P.gold2, { shadow: P.ink });
+    app.hoverId = null; canvas.style.cursor = 'pointer';
+    return true;
+  }
+  const F = CC.FONT;
+  let lastPhase = null;
+
   function frame(dt) {
     app.t += dt;
     DBG.tick(dt);
+    if (app.phase !== lastPhase) { lastPhase = app.phase; document.body.classList.toggle('intro', app.phase === 'intro'); }
+    if (app.phase === 'intro') {
+      if (app.click) app.endIntro();                       // klik overslaat; de klik zelf raakt het menu niet
+      else { ctx.imageSmoothingEnabled = false; if (introFrame(dt)) return; }
+      document.body.classList.remove('intro'); lastPhase = app.phase;
+    }
     // klik verwerken met de klikvlakken van de vorige frame
     if (app.click) {
       const h = UI.pick(app.click.x, app.click.y);
       if (h && h.onClick) h.onClick();
       else if (!h && app.panel && app.phase === 'prep') app.closePanel();
       app.click = null;
+      if (app.phase === 'intro') { lastPhase = null; return; }   // "Intro" in het menu: vanaf de volgende frame speelt de intro
     }
     // simulatie
     if (app.advice) app.advice.t += dt;

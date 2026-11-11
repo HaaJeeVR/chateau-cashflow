@@ -29,7 +29,7 @@ const server = http.createServer((req, res) => {
   const playDay = () => ev(() => { app.openShop(); app.skipDay(); });
   const nextFromResult = () => ev(() => { app.resultT = 9; app.afterResult(); while (app.phase === 'levelup' || app.phase === 'staffup') { if (app.phase === 'levelup') app.afterLevel(); else app.afterStaffUp(); } });
 
-  await page.goto(url); await page.evaluate(() => localStorage.clear()); await page.reload(); await wait(500);
+  await page.goto(url); await page.evaluate(() => { localStorage.clear(); CC.setSetting('introSeen', true); }); await page.reload(); await wait(500);   // intro overslaan (test_intro.js test die)
   await shot('01-titel-leeg');
 
   console.log('H-1: herladen op de kassabon herhaalt de dag niet');

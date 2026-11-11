@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-10-01 — Intro bij de eerste start
+
+| # | Besluit | Reden |
+|---|---|---|
+| 86 | **Intro van 21,4 s vóór het titelscherm, alleen bij de eerste start** (`src/intro.js`). Zes shots: (1) grachtenstraat in de ochtendschemer, motregen, gekalkte ruiten en een bord "TE KOOP – ook geschikt als kantoor" · (2) envelop schuift over de deurmat van de nog donkere winkel · (3) brief van J.P. Morgenstond & Co. ("Financieringsverzoek gehonoreerd.", termijnen live uit `CC.CONFIG.repay`, stempel GEHONOREERD, kleine lettertjes uit `texts.js`) · (4) "De bank was er eerder.", sleutel in het slot (kaartje), licht knippert aan · (5) montage: kast 3 en 4 vallen op hun plek, vakken vullen zich, Sem met een krat, vitrine, uithangbord gaat branden, "Nu alleen nog klanten." · (6) logo valt op zijn plek op de nachtelijke gevel, "Klik om te beginnen". Het eindbeeld is pixel voor pixel het titelscherm, dus het menu komt er zonder knip overheen. **Techniek:** één functie `INTRO.renderAt(ctx, t)`, deterministisch; overgangen met ordered dither (alleen bestaande kleuren); geen zoom (één pixeldichtheid); geen geluid. Kleurcorrecties (ochtend, donker) staan als PNG in `assets/intro_*.png` via `tools/build_intro.py`, omdat de browser bij dubbelklikken op index.html (file://) geen pixels mag teruglezen. **Bediening:** klik, toets of tik slaat over (een tik raakt daarna geen menuknop); vlag `introSeen` in een eigen opslag (`chateau-cashflow-instellingen`), niet in de spelsave; knop "Intro" in de voetregel van het titelscherm; `prefers-reduced-motion` = fade van 0,8 s naar het stilstaande eindbeeld. Testen: `index.html?intro` speelt altijd, `?intro=12.5` staat stil (◀ ▶ scrubben). Test: `tools/test_intro.js` (browser). De montage laat bewust kast 3/4 en Sem zien als vooruitblik. Uit de brief is het leenbedrag weggelaten (een grachtenpand voor €5.480 klopt niet). | Wens HJ: een korte, droge opening in de stijl van de game, die de lening en de winkel neerzet voordat je begint. De vlag staat los van de save, anders komt de intro na elk faillissement terug. Gekalkte ruiten en het sleutelkaartje zijn nu door de code getekend; prompts J1 en J2 in 02_ART §10 vervangen ze door gegenereerde beelden. |
+
+---
+
 ## 2026-09-27 — Audit (Astra) + speelronde vriend: fase 0–3 gebouwd, M7a tutorial, M7b levendigheid
 
 Audit door een ander model en een speelronde van een vriend. Alle P1-fouten uit de audit bleken te kloppen (nagelopen in de code); de prioriteitenlijst staat in de chat van 2026-09-26/27. Fase 0 (bugs) is gebouwd; de rest volgt.
