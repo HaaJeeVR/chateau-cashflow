@@ -42,11 +42,17 @@ Chateau Cashflow/
 │  ├─ test_advies.js   ← elke adviesvraag oplosbaar? (--md schrijft 06_ADVIESVRAGEN.md)
 │  ├─ test_fase0.js    ← regressie audit: bank/uitstel/kaarten eenmalig, elke klant een uitkomst (ook 4×), levering
 │  ├─ test_hervatten.js ← herladen op bon/zondag in een echte browser (optioneel, vraagt Playwright)
+│  ├─ test_fase3.js    ← avondinzicht, niveaus, klussen, failliet-analyse
+│  ├─ test_intro.js    ← intro en feedbackknop in een echte browser (Playwright)
+│  ├─ test_fietser.js  ← fietser: hooguit eens per 30–60 s, nooit op een stoep met voetgangers, puur beeld
 │  ├─ balance.js       ← headless simulatie (node), gebruikt src/sim.js  [M2]
 │  ├─ build_bg.py      ← achtergrond + lagen uit art_bronnen/ (ook vitrine en winkelfases)
 │  ├─ measure_planks.py ← plankposities in de kasten meten
-│  ├─ build_sprites.py ← personages uit art_bronnen/personages/ (<type>_<voor|achter>.png)
-│  ├─ build_tiles.py   ← tegels niveauscherm + iconen Investeren uit art_bronnen/tegels/tegels_bron.png (4 × 3 op magenta)
+│  ├─ import_bladen.py ← figuren uit bladen van 2 × 3 (art_bronnen/personages/bladen_2026-11-12): staand + walk2/walk3, voor en achter, + sprites.js
+│  ├─ build_sprites.py ← alleen nog --manifest (sprites.js uit assets/chr_*); oude route <type>_<voor|achter>.png
+│  ├─ build_tiles.py   ← tegels + iconen voor kast, koeling, vitrine, uithangbord uit art_bronnen/tegels/tegels_bron.png; schrijft alleen als de pixels veranderen
+│  ├─ build_figuurtegels.py ← tegels met figuren (niveauscherm, personeelsvenster) uit de staande sprites; draait mee met build_tiles.py
+│  ├─ build_voorgrond.py ← lantaarnpaal en paaltjes uit de achtergrond → assets/fg_straat.png
 │  ├─ build_critters.py ← kat en muis uit art_bronnen/dieren/
 │  ├─ build_portraits.py ← portretten uit art_bronnen/portretten/ (<wie>_<neutraal|blij|boos>.png)
 │  └─ pixelize.py      ← pixelpipeline voor sprites (02_ART §3)  [M8]
@@ -174,7 +180,7 @@ Elke mijlpaal: bouwen → zelf testen (sim + klikken) → HJ speelt → feedback
 
 ### M7 — Juice en tutorial
 - Alles uit ontwerp §12 (zonder geluid), eerste 5 minuten uit ontwerp §11.
-- **M7a eerste 5 minuten ✔ 2026-09-27** (besluit 78). **M7b levendigheid ✔** (besluit 79; fietser zodra HJ de tekeningen levert: prompt H in 02_ART, `art_bronnen/personages/fietser_<voor|achter>_<1|2>.png`). **Geen geluid** (besluit 80).
+- **M7a eerste 5 minuten ✔ 2026-09-27** (besluit 78). **M7b levendigheid ✔** (besluit 79; fietser ✔ besluit 98: `assets/fietser_<voor|achter>_<1|2>.png`, zie 02_ART §11). **Geen geluid** (besluit 80).
 
 **Klaar als:** een nieuwe speler zonder uitleg de eerste week doorkomt (test: iemand die het spel nog niet kent; niets zeggen, meekijken).
 
@@ -184,6 +190,7 @@ Elke mijlpaal: bouwen → zelf testen (sim + klikken) → HJ speelt → feedback
 - Nieuwe achtergrond? Vervang de bronnen in `art_bronnen/`, draai beide scripts, controleer de plankwaarden.
 
 ### M8 — Art
+- Stand 2026-11-12: figuren, loopbeelden, fietser, straatvoorgrond en de haken voor de eindbeelden staan in 02_ART §11.
 - `tools/pixelize.py`, masterpalet, assets wisselen per ID.
 - Art kan al eerder, zodra HJ assets aanlevert: grijze blokken worden vanzelf vervangen zodra een asset met het juiste ID in `assets/` staat.
 
@@ -224,7 +231,7 @@ Zou ik willen:
 Geen afspraak om nu te bouwen; wel vastgelegd zodat we erop terugkomen.
 
 ### Personages
-- ✔ **Varianten per klanttype** (besluit 64): buurt 3, koopjes 2, liefhebber 3, snob 2. Meer kan: `<type><n>.png` als blad (voor links, achter rechts) in `art_bronnen/personages/`, daarna `build_sprites.py` draaien. ~~Varianten per klanttype~~ Ideeën: buurtbewoner als man met boodschappentas en als jonge moeder; tweede koopjesjager; oudere liefhebber. Bestandsnamen: `art_bronnen/personages/<type><n>_<voor|achter>.png` (bv. `buurt2_voor.png`). Code kiest dan per klant willekeurig een variant.
+- ✔ **Varianten per klanttype** (besluit 64, 97): nu buurt 7, koopjes 3, liefhebber 5, snob 3, allemaal met loopbeelden. Meer kan: een blad van 2 × 3 in `art_bronnen/personages/bladen_2026-11-12/` en `tools/import_bladen.py` draaien (02_ART §11). ~~Meer kan: `<type><n>.png` als blad (voor links, achter rechts) in `art_bronnen/personages/`, daarna `build_sprites.py` draaien.~~ ~~Varianten per klanttype~~ Ideeën: buurtbewoner als man met boodschappentas en als jonge moeder; tweede koopjesjager; oudere liefhebber. Bestandsnamen: `art_bronnen/personages/<type><n>_<voor|achter>.png` (bv. `buurt2_voor.png`). Code kiest dan per klant willekeurig een variant.
 - ✔ (besluit 64) **Liefhebber → verkoopster.** De huidige liefhebber (groen schort, fles + glas) wordt het personeel "verkoper" in M5. Nieuwe liefhebber genereren **zonder schort**, bv. met notitieboekje en leesbril.
 - ✔ (gecontroleerd 2026-09-28: geen van de 10 klantsprites heeft nog een glas) **Geen wijnglas in de hand** bij klanten (buurtbewoner en liefhebber lopen nu met een glas). Bij de volgende ronde meevragen: "no wine glass".
 - Personeel (M5) en bankier-portret (M2) in dezelfde stijl, met de achtergrond als stijlreferentie.

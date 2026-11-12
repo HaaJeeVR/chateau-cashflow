@@ -82,7 +82,7 @@ Regel: feedbackkleuren (rood/groen) worden **alleen** voor spelfeedback gebruikt
 Dit scheelt veel beeldgeneratie en houdt alles consistent:
 
 - **Flessen op het schap:** kleine 3×7-px flessen in de kleur van de wijn (fles + capsule), getekend door de code. Eén schap-sprite volstaat voor alle 12 wijnen.
-- **Beweging:** klanten hebben één stilstaande sprite; lopen = op-en-neer wiebelen (1 px) + spiegelen voor richting. Geen frame-animaties nodig.
+- **Beweging:** ~~één stilstaande sprite + 1 px wiebelen~~ (achterhaald). Elke figuur heeft per aanzicht een staand beeld en twee stapbeelden (`walk2`, `walk3`); lopen = walk2 · staand · walk3 · staand, aan de afgelegde weg gekoppeld, plus spiegelen voor de richting (besluit 96, 97). Zie §11.
 - **Ballonnetjes, zwevende getallen, glinsters, stofwolkjes:** code.
 - **Balken** (reputatie, aflossing), knoppen en panelen: 9-slice van één paneel-asset + code.
 - **Tijd van de dag:** licht door het raam kleurt licht mee (overlay).
@@ -121,7 +121,8 @@ Dit scheelt veel beeldgeneratie en houdt alles consistent:
 | Verkoop | Kamer vol klanten, HUD, snelheidsknoppen; adviesvraag = kaartje in beeld |
 | Dagresultaat | Bonnetje/kassarol die uit de kassa rolt met de getallen |
 | Zondag | Telefoongesprek met bankier (portret + tekstballon), daarna 2 weekkaarten als speelkaarten |
-| Game over | Rolluik gaat dicht, score op het rolluik |
+| Game over | Rolluik zakt over de winkel, venster "Failliet" erboven (haak `rolluik.png`, §11) |
+| Schuldenvrij | Stralenkrans, vuurwerk, blije bankier en score; achtergrond = winkel of het feestbeeld (haak `schuldenvrij.png`, §11) |
 
 ---
 
@@ -166,6 +167,8 @@ Native grootte = grootte in de 640×360-wereld. Status: **P** = placeholder door
 | `obj_sign` | Bord boven de deur met logo | 64 × 20 | *Niet genereren:* verkleinde versie van het logo via de pipeline |
 
 ### Personages (één sprite per stuk, kijkt naar linksvoor, wordt gespiegeld)
+
+> **Achterhaald** (besluit 97): de maten en prompts hieronder zijn van de eerste ronde. Figuren komen nu uit bladen van 2 × 3, zie §11.
 
 | ID | Wie | Native | Prompt |
 |---|---|---|---|
@@ -275,6 +278,8 @@ Daarna, als bewerking van het goedgekeurde resultaat:
 
 ### Prompt B — personages (achtergrond meesturen als stijlreferentie)
 
+> **Achterhaald** voor nieuwe figuren: lever een blad van 2 × 3 (§11). Prompt B blijft als stijlvoorbeeld.
+
 ```
 Pixel-art character sprites in exactly the same style, lighting and pixel size as the attached
 background. Full body, standing, 3/4 view facing front-left, each character separate on a plain
@@ -310,6 +315,8 @@ Varianten (zelfde beeld, alleen de gezichtsuitdrukking): **neutraal** (beleefd, 
 **Status 2026-09-24:** ✔ gemaakt en ingebouwd (80 × 80 in het zondagscherm). Het neutrale bankiersportret is vanaf nu de **stijlreferentie voor alle portretten**.
 
 ### Prompt D — personeel: sprites (achtergrond meesturen als stijlreferentie)
+
+> **Achterhaald** (besluit 97): Sem, Fatima en Dubois komen nu ook uit bladen van 2 × 3 (§11).
 
 Per persoon twee beelden: vooraanzicht en achteraanzicht. Opslaan als `art_bronnen/personages/<sem|fatima|dubois>_<voor|achter>.png`.
 
@@ -382,6 +389,8 @@ light. Head and shoulders, centered, square image, no text.
 
 ### Prompt H — fietser (achtergrond + een klantsprite meesturen als stijlreferentie)
 
+> **Gebouwd** (besluit 98): de vier beelden staan direct in `assets/` (zie §11, Fietser).
+
 Vier beelden van dezelfde fietser: vooraanzicht en achteraanzicht, elk met twee trapstanden. Opslaan als `art_bronnen/personages/fietser_<voor|achter>_<1|2>.png`. Maak eerst `voor_1`; de andere drie als **bewerking** daarvan, dan blijven persoon en fiets gelijk. Rijdt over de straat langs de winkel (M7b), soms met een "Tring!"-ballonnetje.
 
 ```
@@ -433,3 +442,35 @@ cool light, a few raindrops on the paint. Wide 2:1 composition, no hands, no tex
 ```
 
 Daarna als bewerking: `Same image, identical in every detail, only the key has turned a quarter turn: its bow now stands vertical.` → `intro_sleutel_gedraaid_bron.png`.
+
+---
+
+## 11. Figuren, straat en eindbeelden (stand 2026-11-12, besluit 96–101)
+
+Dit vervangt wat §2, §5, §8 en de prompts B en D zeggen over personages.
+
+### Figuren uit bladen van 2 × 3
+
+- **Bron:** per figuur één blad op effen magenta (rood en blauw > 200, groen < 90), `art_bronnen/personages/bladen_2026-11-12/<naam>.png`. Bovenste rij: vooraanzicht staand, stap, stap. Onderste rij: achteraanzicht staand, stap, stap. `<naam>` = klanttype of personeelslid, eventueel met een nummer: `buurt`…`buurt7`, `koopjes`…`koopjes3`, `liefhebber`…`liefhebber5`, `snob`…`snob3`, `sem`, `fatima`, `dubois`. Bestanden die met `alt_` beginnen zijn alternatieven en worden niet ingelezen.
+- **Bouwen:** `python tools/import_bladen.py art_bronnen/personages/bladen_2026-11-12`. Per figuur zes beelden: `assets/chr_<naam>_<front|back>.png` (staand) en `_walk2.png`, `_walk3.png` (stappen). Eén schaal per figuur (het staande vooraanzicht bepaalt die), hoogte per type: buurt 64, koopjes 62, liefhebber 64, snob 68, Sem 64, Fatima 62, Dubois 64 px. Eén voetlijn (onderste rij) en één kader per aanzicht, 27–48 px breed; het bovenlijf staat in het midden van het kader en de stapbeelden worden er zo op gelegd dat het bovenlijf niet verspringt. Eén palet van 28 kleuren voor alle zes, harde alpha. Het script schrijft ook `assets/sprites.js` (manifest + `CC.SPRITE_VARIANTS`).
+- **Kijkrichting:** `CC.SPRITE_FACING` in `src/config.js`. Bij de bladen van 2026-11-12 kijkt het vooraanzicht naar links (−1) en loopt het achteraanzicht naar rechts weg (1); de code spiegelt naar de looprichting.
+- **Lopen** (besluit 96): reeks walk2 · staand · walk3 · staand zolang een figuur loopt, tempo aan de afgelegde weg (`R.WALK_RATE`). Ontbreekt een stapbeeld of heeft het een andere maat, dan het oude wiebelen.
+- **`tools/build_sprites.py`** is alleen nog nodig voor `--manifest` (manifest opnieuw schrijven uit wat er in `assets/` staat; pakt alleen `chr_*`). De oude route met losse `<naam>_<voor|achter>.png` werkt nog, maar herbouwt geen staand beeld waar stapbeelden bij horen (`--forceer` om dat toch te doen).
+- **Tegels** van het niveauscherm en het personeelsvenster komen uit dezelfde staande beelden op ware grootte, met een donker randje van 1 px: `tools/build_figuurtegels.py` (draait mee met `build_tiles.py`, dat alleen nog kast, koeling, vitrine en uithangbord uit `tegels_bron.png` maakt).
+- **Nieuwe figuur:** blad maken, in de bladenmap zetten, script draaien, kijkrichting in `CC.SPRITE_FACING` zetten. Een nieuwe variant van een bestaand type doet vanzelf mee (klanten en voorbijgangers).
+
+### Straat
+
+- **Voorbijgangers** gebruiken alle klantfiguren. Vanaf niveau 6 lopen ze op de linkerstoep om het terras heen (besluit 99).
+- **Voorgrond:** de lantaarnpaal en twee paaltjes links zijn uit de achtergrond geknipt (`assets/fg_straat.png`, `tools/build_voorgrond.py`) en worden over de figuren op straat getekend. Na een nieuwe achtergrond het script opnieuw draaien.
+- **Fietser** (prompt H, besluit 98): `assets/fietser_voor_1.png` en `_2` (50 × 64), `assets/fietser_achter_1.png` en `_2` (46 × 63), transparant, op spelgrootte, direct gebruikt (geen bouwscript). Vooraanzicht rijdt naar linksvoor, achteraanzicht naar rechtsachter; de code spiegelt voor de andere richtingen. Nieuwe beelden met andere afmetingen? Dan in `src/fx.js` de punten waar de wielen de grond raken bijwerken (`BIKE_WHEELS`), anders staat de schaduw verkeerd.
+
+### Eindbeelden (haken)
+
+Beide beelden zijn optioneel: ontbreekt het bestand, dan tekent de code het scherm zoals nu.
+
+| Bestand | Maat | Gebruik | Prompt |
+|---|---|---|---|
+| `assets/rolluik.png` | 640 × 343 | Failliet: zakt in 1,25 s van boven (onder de HUD, y 17) over de winkel en veert even na; venster "Failliet" erboven, dus het midden rustig houden | M1 in `claude/08_ART_PAKKET_B.md` |
+| `assets/schuldenvrij.png` | 640 × 360 | Schuldenvrij: vloeit in 0,6 s over de winkel heen als achtergrond; venster met bankier en score erboven, licht gedimd; de HUD blijft bovenaan (bovenste 17 px vallen eronder) | M2 in `claude/08_ART_PAKKET_B.md` |
+
