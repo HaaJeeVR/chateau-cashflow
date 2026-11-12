@@ -252,8 +252,8 @@
       const hv = UI.hit(app, 'fc_' + k, x + 3, yy - 2, w - 6, 12, null, `${info.many}: budget €${ct.budget[0]}-${ct.budget[1]}; ${info.want}`);
       if (hv && !s.flags.seenForecast) s.flags.seenForecast = true;
       if (hv) R().round(ctx, x + 3, yy - 2, w - 6, 12, 3, 'rgba(232,181,58,0.18)');
-      R().round(ctx, x + 6, yy, 7, 7, 3, P.ink); R().round(ctx, x + 7, yy + 1, 5, 5, 2, ct.look.body);
-      F().draw(ctx, `${n} ${n === 1 ? info.one : info.many}`, x + 16, yy, P.cream2);
+      R().typeIcon(ctx, k, x + 4, yy - 2, true);
+      F().draw(ctx, `${n} ${n === 1 ? info.one : info.many}`, x + 18, yy, P.cream2);
       F().draw(ctx, `€${ct.budget[0]}-${ct.budget[1]}`, x + w - 6, yy, P.stone2, { align: 'right' });
       yy += 12;
     }
@@ -611,7 +611,7 @@
     Object.keys(CC.CUSTOMER_TYPES).filter(k => T[k]).forEach((k, i) => {
       const ts = T[k];
       if (i % 2 === 0) R().round(ctx, x + 8, y - 2, PW - 16, 12, 3, P.cream3);
-      F().draw(ctx, CC.CUSTOMER_TYPES[k].name, x + 14, y, P.ink);
+      R().typeIcon(ctx, k, x + 12, y - 2); F().draw(ctx, CC.CUSTOMER_TYPES[k].name, x + 27, y, P.ink);
       F().draw(ctx, String(ts.n), x + 150, y, P.ink, { align: 'right' });
       F().draw(ctx, String(ts.buyers), x + 186, y, ts.buyers ? P.green2 : P.stone2, { align: 'right' });
       F().draw(ctx, String(ts.tooExpensive), x + 218, y, ts.tooExpensive ? P.red : P.stone2, { align: 'right' });
@@ -2019,11 +2019,11 @@
     const top = y + 58;
     F().draw(ctx, 'Wijn', x + 16, top, P.bord2);
     C.priceStands.forEach((st, k) => F().draw(ctx, st.name, x + 150 + k * 50 + 23, top, P.bord2, { align: 'center' }));
-    // koppen van de budgetbalkjes: gekleurde stip per klanttype
+    // koppen van de budgetbalkjes: icoontje per klanttype (besluit 103)
     const bx0 = x + 356, bstep = types.length ? Math.min(22, Math.floor(80 / types.length)) : 20;
     types.forEach((k, j) => {
       const ct = CC.CUSTOMER_TYPES[k], cx = bx0 + j * bstep;
-      R().round(ctx, cx + 3, top - 1, 9, 9, 4, P.ink); R().round(ctx, cx + 4, top, 7, 7, 3, ct.look.body);
+      R().typeIcon(ctx, k, cx + 1, top - 3);
       UI.hit(app, 'bh_' + k, cx, top - 2, bstep, 11, null, `${CC.TEXT.typeInfo[k].many} (${plan.filter(p => p.type === k).length} vandaag)`);
     });
     if (types.length) UI.hit(app, 'bh_all', bx0 - 2, top - 2, 2, 11, null, T.budgetHelp);
@@ -2056,10 +2056,10 @@
       ry += rowH;
     });
     F().wrap(T.pricesFoot, AW - 32).slice(0, 2).forEach((l, i) => F().draw(ctx, l, x + 16, y + AH - 40 + i * 10, P.stone1));
-    // legenda van de balkjes: welk bolletje is welk klanttype
+    // legenda van de balkjes: welk icoontje is welk klanttype
     let lx = x + 16; const ly = y + AH - 18;
     F().draw(ctx, 'Balkjes:', lx, ly, P.bord2); lx += F().width('Balkjes:') + 6;
-    types.forEach(k => { const ct = CC.CUSTOMER_TYPES[k]; R().round(ctx, lx, ly - 1, 9, 9, 4, P.ink); R().round(ctx, lx + 1, ly, 7, 7, 3, ct.look.body); lx += 12; const nm = CC.TEXT.typeInfo[k].many; F().draw(ctx, nm, lx, ly, P.ink); lx += F().width(nm) + 10; });
+    types.forEach(k => { R().typeIcon(ctx, k, lx, ly - 3); lx += 15; const nm = CC.TEXT.typeInfo[k].many; F().draw(ctx, nm, lx, ly, P.ink); lx += F().width(nm) + 10; });
   };
 
   CC.UI = UI;

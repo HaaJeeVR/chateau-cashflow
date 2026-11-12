@@ -776,6 +776,32 @@
 
   // ---------- Klanten (placeholder, ± 66 px hoog; wordt vervangen door gegenereerde sprites) ----------
   // Gegenereerde sprite (als geladen), anders de placeholder hieronder.
+  // Icoontjes per klanttype (D1, besluit 102): 12 × 12, getekend in CC.PAL, herkenbaar aan hun silhouet:
+  // buurtbewoner = huisje, koopjesjager = muntje, liefhebber = wijnglas, statuszoeker = diamant (keuze HJ).
+  // Letters → paletkleur: k ink · g/G/l groen · y/o/w/W goud en hout · r/R/b bordeaux · c/C crème · s/S glas.
+  const TYPE_ICONS = {
+    buurt: ['.....kk.....', '....krrk.kk.', '...krrrrkWk.', '..krrrrrrkk.', '.krrrrrrrrk.', 'kkkkkkkkkkkk', '.kCCCCCCCCk.', '.kCssCCWWCk.', '.kCssCCWWCk.', '.kCCCCCWWCk.', '.kCCCCCWWCk.', '.kkkkkkkkkk.'],
+    koopjes: ['....kkkk....', '..kkooyykk..', '.koooooyyok.', '.kowwwwwwok.', 'kowoooooowok', 'kowoooooywok', 'kowooooooWok', 'kowooooooWWk', '.kowwwwwwWk.', '.koooooooWk.', '..kkWWWWkk..', '....kkkk....'],
+    liefhebber: ['..kkkkkkkk..', '..ksccccsk..', '..kscccssk..', '..krrrrrRk..', '..krrrrrRk..', '...krrrRk...', '....kkkk....', '.....ks.....', '.....ks.....', '.....ks.....', '...kkssskk..', '...kkkkkkk..'],
+    snob: ['............', '..kkkkkkkk..', '.ksSsssSssk.', 'kssSsssSsssk', 'kkkkkkkkkkkk', '.kSssSsSssk.', '..kSsSsSsk..', '...kSsSsk...', '....kSsk....', '.....kk.....', '............', '............'],
+  };
+  const ICON_COL = { k: 'ink', g: 'green3', G: 'green2', l: 'green4', y: 'gold2', o: 'gold', w: 'wood3', W: 'wood2',
+    r: 'bord3', R: 'bord2', b: 'bord1', c: 'cream3', C: 'cream1', s: 'glass2', S: 'glass1' };
+  const iconCache = {};
+  // dark = op een donker venster: dan is de omlijning lichtgrijs in plaats van inkt, anders valt het silhouet weg
+  R.typeIcon = function (ctx, type, x, y, dark) {   // (x, y) = linksboven; tekent niets voor een onbekend type
+    const map = TYPE_ICONS[type]; if (!map) return false;
+    const key = type + (dark ? '_d' : '');
+    let c = iconCache[key];
+    if (!c && typeof document !== 'undefined') {
+      c = iconCache[key] = document.createElement('canvas'); c.width = 12; c.height = 12;
+      const g = c.getContext('2d');
+      map.forEach((row, yy) => { for (let xx = 0; xx < 12; xx++) { const ch = row[xx]; if (ch !== '.') { g.fillStyle = ch === 'k' && dark ? P.stone2 : P[ICON_COL[ch]]; g.fillRect(xx, yy, 1, 1); } } });
+    }
+    if (c) ctx.drawImage(c, Math.round(x), Math.round(y));
+    return true;
+  };
+
   function hashOffset(c) {
     const h = (c.id * 2654435761) >>> 0;
     return [(h % 11) - 5, ((h >>> 8) % 5) - 2];   // −5..5 px opzij, −2..2 px diepte
