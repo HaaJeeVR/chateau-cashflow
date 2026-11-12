@@ -443,6 +443,16 @@
   ];
 
   // Reacties op het advies (sleutel = uitkomst uit SIM.answerAdvice)
+  // A6: over welke wijn(en) gaat het weetje? Het weetje staat alleen in beeld als de speler een van deze wijnen koos.
+  // Niet in de lijst = algemeen weetje (eten, techniek, de vraag zelf): altijd tonen.
+  CC.TEXT.weetjeOver = {
+    q02: ['wine_provence'], q03: ['wine_sauvignon'], q04: ['wine_provence'], q05: ['wine_merlot'], q07: ['wine_merlot'],
+    q08: ['wine_sauvignon'], q09: ['wine_rioja'], q11: ['wine_cremant', 'wine_champagne'], q12: ['wine_chablis'], q14: ['wine_chablis'],
+    q15: ['wine_cremant', 'wine_champagne'], q16: ['wine_sauvignon'], q17: ['wine_gewurz'], q18: ['wine_rioja'], q19: ['wine_cremant', 'wine_champagne'],
+    q20: ['wine_sauvignon'], q21: ['wine_chablis', 'wine_champagne'], q22: ['wine_gewurz'], q23: ['wine_rioja'], q27: ['wine_port'],
+    q28: ['wine_bordeaux'], q31: ['wine_bordeaux'], q32: ['wine_barolo'], q33: ['wine_barolo'], q34: ['wine_barolo'],
+    q35: ['wine_champagne', 'wine_cremant'], q36: ['wine_cremant'], q38: ['wine_gevrey', 'wine_champagne'], q39: ['wine_gevrey'], q40: ['wine_gevrey', 'wine_chablis'],
+  };
   CC.TEXT.adviceReply = {
     good: ['Perfect, die neem ik.', 'Zie je wel, daar kom ik voor.', 'U bent goed. Echt.', 'Ik kom terug. Met mijn zus.', 'Die schrijf ik op.', 'Kijk. Daar heb je wat aan.'],
     wrong: ['Daar vroeg ik niet om.', 'Hm. Had u wel geluisterd?', 'Ik zoek het zelf wel uit.', 'Dat is juist wat ik niet wilde.', 'Nee hoor. Laat maar.'],

@@ -1166,9 +1166,11 @@
     let why = (r.result === 'wrong' || r.result === 'tooExpensive') ? CC.adviceWhy(r.q, CC.wineById(r.wineId), r.miss, r.price) : null;
     if ((r.result === 'wrong' || r.result === 'falseNone') && r.q.uitleg) why = why ? why + ' ' + r.q.uitleg : r.q.uitleg;
     const goodNames = (r.goodIds || []).map(id => CC.wineById(id).name);
-    const weetje = F().wrap(r.q.weetje, w - 52);
+    // A6: het weetje alleen als het over de gekozen wijn gaat (of algemeen is); anders alleen de uitleg
+    const over = (CC.TEXT.weetjeOver || {})[r.q.id];
+    const weetje = !over || over.includes(r.wineId) ? F().wrap(r.q.weetje, w - 52) : [];
     const whyLines = why ? F().wrap(why, w - 36) : [];
-    const h = 120 + whyLines.length * 10 + (r.result !== 'good' ? 12 : 0) + weetje.length * 10;
+    const h = (weetje.length ? 120 + weetje.length * 10 : 100) + whyLines.length * 10 + (r.result !== 'good' ? 12 : 0);
     const y = Math.round(180 - h / 2 + (1 - ease) * 16);
     R().panel(ctx, x, y, w, h);
     HF().draw(ctx, head, x + w / 2, y + 14, good ? P.green2 : P.bord3, { align: 'center' });
@@ -1185,12 +1187,14 @@
     F().draw(ctx, reward, x + w / 2, yy + 2, good ? P.green2 : P.bord2, { align: 'center' });
     yy += 16;
     // weetje
-    const wh = weetje.length * 10 + 18;
-    R().round(ctx, x + 16, yy, w - 32, wh, 6, P.gold);
-    R().round(ctx, x + 17, yy + 1, w - 34, wh - 2, 5, '#fffaf0');
-    R().pill(ctx, x + 24, yy - 5, 52, 11, P.bord2, P.ink);
-    F().draw(ctx, 'WEETJE', x + 50, yy - 3, P.cream3, { align: 'center' });
-    weetje.forEach((l, i) => F().draw(ctx, l, x + 26, yy + 16 + i * 10, P.ink));
+    if (weetje.length) {
+      const wh = weetje.length * 10 + 18;
+      R().round(ctx, x + 16, yy, w - 32, wh, 6, P.gold);
+      R().round(ctx, x + 17, yy + 1, w - 34, wh - 2, 5, '#fffaf0');
+      R().pill(ctx, x + 24, yy - 5, 52, 11, P.bord2, P.ink);
+      F().draw(ctx, 'WEETJE', x + 50, yy - 3, P.cream3, { align: 'center' });
+      weetje.forEach((l, i) => F().draw(ctx, l, x + 26, yy + 16 + i * 10, P.ink));
+    }
     UI.btn(app, ctx, 'adv_ok', x + w / 2 - 55, y + h - 28, 110, 18, 'Verder ▶', () => app.closeAdvice(), { tone: 'bord', tip: 'Spatie' });
   };
 

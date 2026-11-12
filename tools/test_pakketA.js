@@ -149,6 +149,26 @@ const server = http.createServer((req, res) => {
   const kh = await hit('klus_6');
   check('klus krijgt ruimte voor twee regels', kh && kh.h >= 30, kh && kh.h);
 
+  // ---------- A6: weetje alleen bij de gekozen wijn ----------
+  console.log('A6: weetje alleen als het over de gekozen wijn gaat');
+  const advShow = async (wineId, result) => {
+    await ev(([wineId, result]) => {
+      const q = CC.TEXT.advice.find(x => x.id === 'q12');
+      if (app.phase !== 'sale') { app.newGame(); const s = app.s; s.flags.introSeen = true; s.mishap = null; CC.SIM.buy(s, 'wine_merlot', 12); CC.SIM.assignVak(s, 'vak_1', 'wine_merlot'); app.startPrep(); while (app.notice) app.closeNotice(); app.openShop(); }
+      app.advice = { c: { type: 'buurt' }, stage: 'result', t: 1, res: { result, q, wineId, price: 9, tip: 1, dr: result === 'good' ? 1 : -1, miss: ['regio'], goodIds: ['wine_chablis'], reply: 'Hm.' } };
+    }, [wineId, result]);
+    await frames(3);
+    return ev(() => !!CC.UI.hits.find(h => h.id === 'adv_ok'));
+  };
+  check('Chablis gekozen bij de oestervraag: venster tekent', await advShow('wine_chablis', 'good'));
+  await shot('A6-weetje-chablis');
+  check('Sauvignon gekozen: venster tekent zonder weetje', await advShow('wine_sauvignon', 'wrong'));
+  await shot('A6-geen-weetje-sauvignon');
+  const a6 = await ev(() => { const o = CC.TEXT.weetjeOver; return Object.keys(o).every(k => CC.TEXT.advice.some(q => q.id === k) && o[k].every(id => CC.wineById(id))); });
+  check('weetjeOver verwijst naar bestaande vragen en wijnen', a6);
+  await ev(() => { app.advice = null; app.skipDay(); });
+  await frames(4);
+
   check('geen fouten in de console', errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close(); server.close();
   console.log(fails ? `\n${fails} FOUT(EN)` : '\nAlles groen.');
