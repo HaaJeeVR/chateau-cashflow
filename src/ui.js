@@ -1620,8 +1620,8 @@
     return { rows, total: rows.reduce((a, r) => a + r.p, 0) };
   };
   UI.wonPanel = function (app, ctx, t) {
-    const s = app.s;
-    UI.dim(app, ctx, 0.55);
+    const s = app.s, feest = app.images.schuldenvrij;
+    UI.dim(app, ctx, feest && feest.complete && feest.naturalWidth ? 0.25 : 0.55);   // het feestbeeld minder dimmen
     const w = 400, h = 284, x = 120, y = 36;
     UI.rays(ctx, 320, y + 30, 320, app.t, 0.15 * Math.min(1, t / 0.5));
     UI.celebrate(app, x + 10, x + w - 10, y - 10);

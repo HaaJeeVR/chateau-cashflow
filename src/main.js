@@ -41,6 +41,9 @@
   if (CC.FX && CC.FX.BIKE_SRC) for (const k in CC.FX.BIKE_SRC) loadImg('fiets_' + k, CC.FX.BIKE_SRC[k]);   // fietser (besluit 98); ontbreekt een beeld, dan rijdt ze niet
   // Eindbeeld failliet (B3): bestaat assets/rolluik.png, dan vervangt hij vanzelf het getekende rolluik (besluit 94).
   { const rl = new Image(); rl.onerror = () => { app.images.rolluik = null; }; rl.src = 'assets/rolluik.png'; app.images.rolluik = rl; }
+  // Feestbeeld schuldenvrij (D1): bestaat assets/schuldenvrij.png (640 × 360), dan is dat de achtergrond van het
+  // schuldenvrij-scherm in plaats van de winkel (besluit 101); ontbreekt het, dan blijft alles zoals het was.
+  { const sv = new Image(); sv.onerror = () => { app.images.schuldenvrij = null; }; sv.src = 'assets/schuldenvrij.png'; app.images.schuldenvrij = sv; }
   CC.IMAGES = app.images;
   const logoSign = new Image(); logoSign.onload = () => { R.roomCache = null; }; logoSign.src = 'assets/logo_sign.png'; app.images.logoSign = logoSign;
 
@@ -712,6 +715,10 @@
     UI.hits = [];
     ctx.imageSmoothingEnabled = false;
     drawWorld(dt);
+    const feest = app.images.schuldenvrij;
+    if (app.phase === 'won' && feest && feest.complete && feest.naturalWidth) {   // vloeit in 0,6 s over de winkel heen
+      ctx.globalAlpha = Math.min(1, app.phaseT / 0.6); ctx.drawImage(feest, 0, 0, 640, 360); ctx.globalAlpha = 1;
+    }
     if (app.phase === 'title') { UI.title(app, ctx); }
     else {
       UI.worldHits(app);
