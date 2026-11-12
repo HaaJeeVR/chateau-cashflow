@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-11-12 — Pakket A na de tweede review (handoff `claude/10_HANDOFF_NA_REVIEW2.md`)
+
+Fouten en kleine dingen uit twee gespeelde runs van Fable. Geen getallen in `config.js` veranderd. Test: `tools/test_pakketA.js` (browser, bedient het spel met muisklikken en tikken op de klikvlakken).
+
+| # | Besluit | Reden |
+|---|---|---|
+| 106 | **Bestellen, bruiloft en Ronnie (A1, A3, A4).** (1) +6 en +12 blijven aan zolang er nog een fles te bestellen is en vullen aan tot het weekmaximum; −6 gaat naar 0. (2) De bruiloft telt bij "Winkel openen" (na de ochtendbestelling) in plaats van aan het begin van de ochtend; de melding komt dan eerst en wegklikken opent de winkel. Donderdag staat in het dagrapport een herinnering als er nog te weinig mousserend is (`SIM.pendingOrder`). De balansbot bestelt de bruiloft nu op vrijdagochtend. (3) Ronnie stelt geen wijnen zonder schap meer voor en zegt "aangevuld tot je lijst van gisteren" alleen als hij echt iets klaarzette; op de eerste ochtend een eigen zin. | Gevrey (4 per week) was nooit te bestellen en Champagne alleen tot 6. Met 18 flessen in huis en 18 in bestelling mislukte de bruiloft. |
+| 107 | **Failliet-analyse (A2).** Verloren klanten tellen tegen de marge per koper; "te duur" weegt even zwaar als "op". "Op" op een dag zonder geld om bij te bestellen heet "lege kas" (nieuwe regel, geen wijn genoemd). "Te weinig marge per dag" komt alleen nog als er niets concreters is. | Run 2 (alles op stevig) kreeg alleen "wijn was op" te zien, terwijl elke dag 60–75% wegliep om de prijs. |
+| 108 | **Beeld (A5, A6).** Klussen over twee regels; geen wereldballonnen achter vensters met verduistering; Gisteren rekent met de echte hoogte van het inzichtkader; tooltips van de onderbalk boven de knop; ballonnen nooit met één los woord (`R.bubbleLines`); tekstfont A met een punt; prijsvenster groeit mee zoals het bestelvenster (grote fles, soort en stijl, gisteren verkocht/te duur, marge onder elke prijsknop); tegenvallerkaart krimpt mee. Weetje bij advies alleen als het over de gekozen wijn gaat (`CC.TEXT.weetjeOver`; niet in de lijst = algemeen, altijd tonen). | Review Fable: afgekapte klustekst, "ruif of" naast het zondagvenster, A las als R, halflege vensters, een Chablis-feit bij een Sauvignon-antwoord. |
+| 109 | **Na de winst en na uitstel (A7, A8).** Schuldenvrij: "Opnieuw spelen" naast "Verder spelen"; beste score in de instellingen (naast `introSeen`, niet in de spelsave), op het schuldenvrij-scherm en het titelscherm. De weekkaart van week 8 wordt leeggemaakt bij de overgang naar vrij spelen. Op de zondag na uitstel staat "Opnieuw beginnen" (met bevestiging; het oude spel wordt reservekopie). Een pauzemenu is er niet; het titelscherm had al "Nieuw spel" met bevestiging. | Een reden om nog eens te spelen; wie na uitstel geen kans meer heeft, hoeft geen zes dagen uit te zitten. |
+| 110 | **Telefoon en delen (A9).** Op touch is elk klikvlak minstens 40 × 40 CSS-px (`UI.pickTouch`): de knop het dichtst bij de vinger wint, grote vlakken blokkeren wat eronder ligt, de tekening blijft gelijk. Op prijsstanden, klussen en klanttypes toont de eerste tik de tooltip, de tweede voert uit. Staand: schermvullende melding "Draai je telefoon" in een eigen canvas in de stijl van het spel; de verkoopdag staat dan stil. Geen blauwe tikflits. Favicon (druiventros met C uit het logo) en `og:`-tags met `assets/og_image.jpg` (titelscherm, 1200 × 630); `tools/build_share.py`. Bij 12 wijnen blijven de bestelrijen 17 spelpixels hoog (meer past niet); elke knop krijgt daar zijn eigen dichtstbij-vak. | +6 was 22 × 14 px en sluiten 16 × 14 px op een telefoon; een gedeelde link toonde geen voorbeeld. |
+
+**Balans na pakket A** (150 runs, `STATS=1`): alles 83 · advies 59 · slim 43 · perfect 75 · mix 9 (vóór: 80 · 63 · 43 · 81 · 8). Perfect en advies lijken gezakt, maar met 400 runs geven de versie vóór A, na A en na A zonder de A4-regel 76 · 75 · 77: ruis. Niveau op dag (`alles`, mediaan) 2:4 3:7 4:11 5:14 6:19 7:22 8:25, ongewijzigd. Bruiloft gehaald (advies) 87% → 98%.
+
+---
+
 ## 2026-11-12 — Pakket B (vervolg)
 
 | # | Besluit | Reden |
@@ -221,7 +237,7 @@ Game Dev Story als hoofdreferentie · desktop-first landscape · winkel is het h
 
 - **Geluid** (besluit 80: geen geluid). Fable adviseert het opnieuw te wegen; nog niet besloten.
 - **Functie van prijsstand "scherp"** (besluit 45): nog open, zie het voorstel *lokkertje* hieronder.
-- **Tweede review** volgens `claude/09_HANDOFF_REVIEW2.md`: nog te doen.
+- **Tweede review**: gedaan (Fable, 12-11). Pakket A gebouwd (besluit 106–110); pakket B (niveaus trager, reputatie na niveau 8, weekklus, op-koers-meter, drie leningen, scherp, geluid) wacht per onderdeel op HJ, zie `claude/10_HANDOFF_NA_REVIEW2.md` §4.
 - **Levendigheid, vervolg:** eerste versie staat (besluit 59). Mogelijk later: een fietser of voorbijgangers buiten, personeel dat iets doet (glas poetsen, fles bekijken).
 - ~~**Lonen personeel**~~: met slimme bots is personeel ongeveer neutraal (besluit 70); na HJ's test nog eens bekijken, samen met 4A.
 - ~~**Investeren als hefboom**~~: opgelost in besluit 72 (kasten trekken klanten, alles zichtbaar op de bon).

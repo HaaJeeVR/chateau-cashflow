@@ -45,6 +45,7 @@ Chateau Cashflow/
 │  ├─ test_fase3.js    ← avondinzicht, niveaus, klussen, failliet-analyse
 │  ├─ test_intro.js    ← intro en feedbackknop in een echte browser (Playwright)
 │  ├─ test_fietser.js  ← fietser: hooguit eens per 30–60 s, nooit op een stoep met voetgangers, puur beeld
+│  ├─ test_pakketA.js  ← pakket A na review 2 in een echte browser (Playwright): bedient het spel met muisklikken en tikken op de klikvlakken
 │  ├─ balance.js       ← headless simulatie (node), gebruikt src/sim.js  [M2]
 │  ├─ build_bg.py      ← achtergrond + lagen uit art_bronnen/ (ook vitrine en winkelfases)
 │  ├─ measure_planks.py ← plankposities in de kasten meten
@@ -56,6 +57,7 @@ Chateau Cashflow/
 │  ├─ build_voorgrond.py ← lantaarnpaal en paaltjes uit de achtergrond → assets/fg_straat.png
 │  ├─ build_critters.py ← kat en muis uit art_bronnen/dieren/
 │  ├─ build_portraits.py ← portretten uit art_bronnen/portretten/ (<wie>_<neutraal|blij|boos>.png)
+│  ├─ build_share.py   ← favicon (png + ico) en deelbeeld assets/og_image.jpg uit logo en titelscherm
 │  └─ pixelize.py      ← pixelpipeline voor sprites (02_ART §3)  [M8]
 └─ 01–04 .md          ← docs staan in de hoofdmap
 ```
@@ -174,6 +176,10 @@ Elke mijlpaal: bouwen → zelf testen (sim + klikken) → HJ speelt → feedback
 - ✔ Vijf upgrades (vitrine, derde en vierde kast, koeling, verlicht uithangbord) worden op een niveau te koop en moeten daarna gekocht worden. Venster "Investeren" (toets I) met getekende iconen, status (niveau X / prijs / gekocht) en de vitrinekeuze. Gouden stip en hint bij iets nieuws; niveauscherm toont "nu te koop · €X". Uithangbord krijgt een lamp en gloeit. Kassabon: regel "Investering". `tools/test_invest.js`. Besluit 60.
 - ✔ Kat en muis als sprites van HJ (`tools/build_critters.py`). Besluit 61.
 - ✔ Vitrine als trapje op de tafel (uit `bg_vitrine_bron.png`) en nieuw tegelblad 4 × 3 met iconen voor Investeren. Besluit 62.
+
+### Pakket A na de tweede review  ✔ gebouwd 2026-11-12 (besluit 106–110)
+- Schaarse wijn bestelbaar, failliet-analyse met de echte oorzaak, bruiloft telt bij opening, Ronnies voorstel, beeldfoutjes, weetje bij de gekozen wijn, opnieuw spelen en beste score, opnieuw beginnen na uitstel, touch en delen.
+- Test: `tools/test_pakketA.js` (browser). Pakket B wacht per onderdeel op HJ (`claude/10_HANDOFF_NA_REVIEW2.md` §4).
 
 ### Fase 0–3 na audit en speelronde  ✔ gebouwd 2026-09-27 (besluit 65–77)
 - Fase 0 betrouwbaarheid · fase 1 leesbaarheid · middenvenster Bestellen/Prijzen · fase 2 afstellen (bots als speler, startkas €400) · investeren en personeel zichtbaar en sterker · dagrapport · avondinzicht · niveaus met twee nieuwe dingen en klussen · failliet-scherm met "wat ging er mis".
