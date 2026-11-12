@@ -558,7 +558,7 @@
     // meubels + klanten, gesorteerd op diepte
     const items = [];
     for (const f of SIM.activeFurniture(s)) items.push({ depth: f.x + f.w / 2 + f.y + f.d / 2, f });
-    if (app.day) for (const c of app.day.customers) items.push({ depth: c.x + c.y, c });
+    if (app.day) { R.spreadCrowd(app.day.customers, dt); for (const c of app.day.customers) items.push({ depth: c.x + c.y, c }); }
     // personeel: tijdens de dag de levende figuurtjes, anders op hun vaste plek
     // personeel: tijdens de dag de levende figuurtjes; daarbuiten slenteren ze rond hun vaste plek
     let staff = app.day ? app.day.staff : null;

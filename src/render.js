@@ -776,10 +776,50 @@
 
   // ---------- Klanten (placeholder, ± 66 px hoog; wordt vervangen door gegenereerde sprites) ----------
   // Gegenereerde sprite (als geladen), anders de placeholder hieronder.
-  R.crowdOffset = function (c) {
-    if (c.staff || typeof c.id !== 'number') return [0, 0];
+  function hashOffset(c) {
     const h = (c.id * 2654435761) >>> 0;
     return [(h % 11) - 5, ((h >>> 8) % 5) - 2];   // −5..5 px opzij, −2..2 px diepte
+  }
+  R.crowdOffset = function (c) {
+    if (c.staff || typeof c.id !== 'number') return [0, 0];
+    return c.vo ? [Math.round(c.vo[0]), Math.round(c.vo[1])] : hashOffset(c);   // c.vo: zie R.spreadCrowd
+  };
+  // Deurmat en rij voor de kassa (C1.3, alleen beeld): daar komen en wachten klanten vlak achter elkaar, en in de rij
+  // kan een nieuwe klant op een plek uitkomen waar al iemand staat. Elke frame krijgt wie daar staat een eigen plekje:
+  // op volgorde van binnenkomst (id) de eerste verschuiving uit SPREAD die niemand raakt. Het beeld schuift daar
+  // rustig naartoe (c.vo), dus niemand verspringt. Raakt niets aan de sim: alleen de tekenplek verandert.
+  const SPREAD = [[0, 0], [-12, 1], [12, -1], [-6, 4], [6, -4], [-18, 2], [18, -2], [0, 5], [-12, -4], [12, 4], [-24, 0], [24, 0], [-18, 5], [18, -5]];
+  R.spreadCrowd = function (customers, dt) {
+    const RM = CC.ROOM, Q0 = (RM.queue && RM.queue[0]) || [RM.counter.x, RM.counter.y];
+    const inZone = c => Math.hypot(c.x - RM.door.x, c.y - RM.door.y) < 1.6 ||
+      ((c.state === 'toCounter' || c.state === 'pay') && Math.hypot(c.x - Q0[0], c.y - Q0[1]) < 2.4);
+    const placed = [];   // [schermx, schermy] van wie al een plek heeft
+    const zone = [];
+    for (const c of customers) {
+      if (typeof c.id !== 'number') continue;
+      if (inZone(c)) zone.push(c);
+      else { const [x, y] = R.iso(c.x, c.y), o = c.vo || hashOffset(c); placed.push([x + o[0], y + o[1]]); c.target = null; }
+    }
+    zone.sort((a, b) => a.id - b.id);
+    for (const c of zone) {
+      const [x, y] = R.iso(c.x, c.y), base = hashOffset(c);
+      let best = null, bestD = -1;
+      for (const [dx, dy] of SPREAD) {
+        const ox = base[0] + dx, oy = base[1] + dy;
+        let d = 1e9;
+        for (const [px, py] of placed) d = Math.min(d, Math.max(Math.abs(x + ox - px) / 16, Math.abs(y + oy - py) / 8));
+        if (d >= 1) { best = [ox, oy]; break; }
+        if (d > bestD) { bestD = d; best = [ox, oy]; }
+      }
+      c.target = best; placed.push([x + best[0], y + best[1]]);
+    }
+    const step = 40 * dt;   // px per seconde
+    for (const c of customers) {
+      if (typeof c.id !== 'number') continue;
+      const tg = c.target || hashOffset(c), vo = c.vo || hashOffset(c).slice();
+      for (let i = 0; i < 2; i++) vo[i] += Math.max(-step, Math.min(step, tg[i] - vo[i]));
+      c.vo = vo;
+    }
   };
   // Loopanimatie (besluit 96): walk2 · staand · walk3 · staand, aan de afgelegde weg gekoppeld (walkPhase groeit
   // met 2 per tegel). 1,4 beeld per eenheid = ± 0,7 m per pas: bij 1,5 tegel/s ± 2 passen per seconde, dus de
