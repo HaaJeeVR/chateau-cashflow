@@ -141,6 +141,14 @@ const server = http.createServer((req, res) => {
   });
   check('wijn zonder schap niet in het voorstel', !a4.o.wine_sauvignon && a4.o.wine_merlot > 0 && a4.p, JSON.stringify(a4));
 
+  // ---------- A5: beeldfoutjes die je kunt meten ----------
+  console.log('A5: ballonnen zonder los woord, klussen over twee regels');
+  const bl = await ev(() => ['Crémant de Loire', 'Gevrey-Chambertin', 'Sauvignon Blanc', 'Champagne brut', 'Provence rosé', 'Rioja Crianza'].map(n => CC.R.bubbleLines('Hè, ' + n + ' op.')));
+  check('"Hè, X op.": geen regel van één woord', bl.every(ls => ls.length === 1 || ls.every(l => l.includes(' ') || l.endsWith('-'))), JSON.stringify(bl));
+  await ev(() => { app.newGame(); const s = app.s; s.flags.introSeen = true; s.flags.opened = true; s.level = 7; s.klussen = [{ lvl: 6, n: 4 }, { lvl: 7, n: 2 }]; app.rebuildRoom(); app.startPrep(); while (app.notice) app.closeNotice(); });
+  const kh = await hit('klus_6');
+  check('klus krijgt ruimte voor twee regels', kh && kh.h >= 30, kh && kh.h);
+
   check('geen fouten in de console', errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close(); server.close();
   console.log(fails ? `\n${fails} FOUT(EN)` : '\nAlles groen.');

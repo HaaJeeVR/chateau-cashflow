@@ -222,6 +222,8 @@
     if (x + w + 2 > 638) x = app.mouse.x - w - 6;
     x = Math.max(2, Math.min(636 - w, x));
     if (y + th > 358) y = app.mouse.y - th - 4;
+    // A5: knoppen in de onderbalk: tip boven de knop zelf, zodat hij niet over de knoppen ernaast valt
+    if (h.y >= 300) { x = Math.max(2, Math.min(636 - w, h.x + Math.round((h.w - w) / 2))); y = h.y - th - 3; }
     y = Math.max(18, y);
     R().round(ctx, x, y, w + 2, th, 4, P.ink);
     R().round(ctx, x + 1, y + 1, w, th - 2, 3, P.wood1);
@@ -633,8 +635,10 @@
     const ins = CC.SIM.insight(s, sm);
     if (ins) {
       const go = () => app.focusWine(ins.tab, ins.wine || null); go.tip = null;
-      const lines = F().wrap(UI.insightText(ins), PW - 36).slice(0, 2);
-      UI.insightBox(app, ctx, ins, x + 10, PY + PH - 26 - lines.length * 10, PW - 20, go, CC.TEXT.insight.titleYesterday);
+      // A5: hoogte uit het echte kader (zin + tip); past de tip er niet onder de tabel, dan alleen de zin
+      const room = PY + PH - 6 - (y + 4), noTip = UI.insightHeight(ins, PW - 20, false) > room;
+      const ih = UI.insightHeight(ins, PW - 20, noTip);
+      UI.insightBox(app, ctx, ins, x + 10, Math.max(y + 4, PY + PH - 6 - ih), PW - 20, go, CC.TEXT.insight.titleYesterday, noTip);
     }
   };
 
@@ -784,18 +788,22 @@
     const s = app.s;
     if (!s.flags.opened) return UI.firstDayList(app, ctx, y);   // eerste dag: eerst de checklist
     const open = CC.SIM.klusOpen(s).slice(0, 2); if (!open.length) return;
-    const x = LX, w = LW, h = 14 + open.length * 22;
+    const x = LX, w = LW;
+    // A5: de tekst mag over twee regels, zodat wijn of klanttype altijd zichtbaar is
+    const rows = open.map(k => { const txt = UI.klusText(k.lvl), ls = F().wrap(txt, w - 16); if (ls.length > 2) { ls.length = 2; ls[1] = ls[1] + '..'; } return { k, txt, ls, h: ls.length * 10 + 12 }; });
+    const h = 14 + rows.reduce((a, r) => a + r.h, 0);
     R().round(ctx, x + 2, y + 3, w, h, 6, 'rgba(31,10,14,0.35)');
     R().round(ctx, x, y, w, h, 6, P.ink); R().round(ctx, x + 1, y + 1, w - 2, h - 2, 5, P.wood1); R().round(ctx, x + 2, y + 2, w - 4, h - 4, 5, 'rgba(31,10,14,0.92)');
     F().draw(ctx, CC.SIM.klusOpen(s).length > 1 ? 'Klussen' : 'Klus', x + 8, y + 6, P.gold);
-    open.forEach((k, i) => {
-      const d = CC.SIM.klusDef(k.lvl), ky = y + 17 + i * 22;
-      const txt = UI.klusText(k.lvl), lines = F().wrap(txt, w - 16);
-      F().draw(ctx, lines[0] + (lines.length > 1 ? '..' : ''), x + 8, ky, P.cream2);
-      UI.hit(app, 'klus_' + k.lvl, x + 3, ky - 2, w - 6, 20, null, `${txt} · ${UI.klusReward(k.lvl)} (klus van niveau ${k.lvl})`);
-      const bw = w - 66, f = Math.min(1, k.n / d.need);
-      R().rect(ctx, x + 8, ky + 10, bw, 4, P.wood1); R().rect(ctx, x + 8, ky + 10, Math.round(bw * f), 4, P.gold);
-      F().draw(ctx, `${k.n}/${d.need}`, x + w - 8, ky + 9, P.cream2, { align: 'right' });
+    let ky = y + 17;
+    rows.forEach(({ k, txt, ls, h: rh }) => {
+      const d = CC.SIM.klusDef(k.lvl);
+      ls.forEach((l, j) => F().draw(ctx, l, x + 8, ky + j * 10, P.cream2));
+      UI.hit(app, 'klus_' + k.lvl, x + 3, ky - 2, w - 6, rh - 2, null, `${txt} · ${UI.klusReward(k.lvl)} (klus van niveau ${k.lvl})`);
+      const by = ky + ls.length * 10, bw = w - 66, f = Math.min(1, k.n / d.need);
+      R().rect(ctx, x + 8, by, bw, 4, P.wood1); R().rect(ctx, x + 8, by, Math.round(bw * f), 4, P.gold);
+      F().draw(ctx, `${k.n}/${d.need}`, x + w - 8, by - 1, P.cream2, { align: 'right' });
+      ky += rh;
     });
   };
 
@@ -1318,7 +1326,7 @@
   UI.drawCard = function (ctx, app, id, x, y, opts) {
     opts = opts || {};
     const s = app.s, c = CC.cardById(id), T = CC.TEXT.cards[id], K = KIND[c.kind];
-    const w = CW, h = CH, RR = R();
+    const w = CW, h = opts.h || CH, RR = R();   // opts.h: kortere kaart (tegenvaller zonder effecten, A5)
     const face = '#f7ebc8', faceDark = '#ecdcb2';
     // rand: donker, dan de kleur van de soort kaart, dan goudlijn, dan het vlak
     RR.round(ctx, x, y, w, h, 10, P.ink);
@@ -1454,10 +1462,12 @@
   UI.mishapPanel = function (app, ctx) {
     const s = app.s, m = CC.cardById(s.mishap.id), T = CC.TEXT.cards[m.id];
     UI.dim(app, ctx, 0.6);
-    const cx = 92, cy = 62;
-    R().round(ctx, cx + 3, cy + 4, CW, CH, 10, 'rgba(31,10,14,0.45)');
-    UI.drawCard(ctx, app, m.id, cx, cy, {});
-    const x = cx + CW + 14, y = cy + 30, w = 262, h = 150;
+    // A5: de kaart krimpt mee met de inhoud (een tegenvaller heeft geen effectpillen) en staat op één lijn met het keuzevenster
+    const nl = Math.min(3, F().wrap(T.text, CW - 22).length), chM = 106 + nl * 10 + 16;
+    const h = 150, ch = Math.max(h, chM), cx = 92, cy = Math.round(180 - ch / 2) + 8;
+    R().round(ctx, cx + 3, cy + 4, CW, ch, 10, 'rgba(31,10,14,0.45)');
+    UI.drawCard(ctx, app, m.id, cx, cy, { h: ch });
+    const x = cx + CW + 14, y = cy + Math.round((ch - h) / 2), w = 262;
     R().panel(ctx, x, y, w, h);
     HF().draw(ctx, 'Maandagochtend. Wat doe je?', x + 12, y + 10, P.bord2);
     R().rect(ctx, x + 10, y + 23, w - 20, 1, P.cream1);
@@ -2040,23 +2050,42 @@
     R().rect(ctx, x + 10, top + 9, AW - 20, 1, P.cream1);
     const listed = SIM.listed(s).map(l => l.wine).filter((w, i, a) => a.indexOf(w) === i);
     let ry = top + 13;
-    const rowH = listed.length > 7 ? 26 : 28;
+    // A5 (zoals besluit 91 bij bestellen): de rijhoogte groeit mee met de ruimte, zodat het venster met weinig wijnen
+    // niet half leeg is. Ruim: grote fles, soort en stijl, wat er gisteren gebeurde, en de marge onder elke prijsknop.
+    const avail = (y + AH - 44) - ry, fitH = Math.floor(avail / Math.max(1, listed.length));
+    const rowH = fitH >= 48 ? Math.min(56, fitH) : fitH >= 36 ? Math.min(40, fitH) : (listed.length > 7 ? 26 : 28);
+    const rich = rowH >= 48, mid = !rich && rowH >= 36;
+    const last = s.history[s.history.length - 1], lw = (last && last.wines) || {};
     if (!listed.length) F().draw(ctx, 'Er staat nog niets op je schappen. Bestel eerst iets bij Ronnie.', x + 16, ry + 4, P.stone1);
     listed.forEach((w, i) => {
       if (UI.focusOn(app, w.id)) R().round(ctx, x + 8, ry - 2, AW - 16, rowH - 2, 4, `rgba(232,181,58,${UI.focusOn(app, w.id)})`);
       else if (i % 2 === 0) R().round(ctx, x + 8, ry - 2, AW - 16, rowH - 2, 4, P.cream3);
-      R().bottleMid(ctx, x + 20, ry + 10, w);
-      F().draw(ctx, w.name, x + 30, ry + 2, P.ink);
+      const NX = rich ? 36 : 30;
+      if (rich) { if (!R().wineSprite(ctx, w, 'groot', x + 21, ry + rowH - 6)) R().bottleMid(ctx, x + 21, ry + Math.floor(rowH / 2), w); }
+      else if (mid) { if (!R().wineSprite(ctx, w, 'icoon', x + 19, ry + rowH - 6)) R().bottleMid(ctx, x + 20, ry + 12, w); }
+      else R().bottleMid(ctx, x + 20, ry + 10, w);
+      F().draw(ctx, w.name, x + NX, ry + 2, P.ink);
       const cur = s.prices[w.id], price = SIM.price(s, w.id), cost = CC.wineCost(w);
-      F().draw(ctx, `inkoop ${R().euro(cost)} · marge ${R().euro(price - cost)}`, x + 30, ry + 12, P.stone1);
+      const colW = 146 - NX, fit = t => { while (F().width(t) > colW && t.includes(', ')) t = t.slice(0, t.lastIndexOf(', ')); while (F().width(t) > colW && t.length > 3) t = t.slice(0, -2) + '.'; return t; };
+      // ruim: marge staat onder elke prijsknop, dus hier alleen de inkoop
+      F().draw(ctx, rich || mid ? `inkoop ${R().euro(cost)}` : `inkoop ${R().euro(cost)} · marge ${R().euro(price - cost)}`, x + NX, ry + 12, P.stone1);
+      if (rich || mid) {
+        const stijl = (w.stijl || []).filter(st => st !== 'bubbels').map(st => CC.TEXT.stijlAdj[st] || st);
+        F().draw(ctx, fit([CC.TEXT.soortName[CC.roleById(w.role).kind]].concat(stijl).join(', ')), x + NX, ry + 22, P.wood2);
+      }
+      if (rich && last) {
+        const g = lw[w.id] || { sold: 0, tooExpensive: 0 };
+        F().draw(ctx, fit(`gisteren ${g.sold} verkocht` + (g.tooExpensive ? `, ${g.tooExpensive} te duur` : '')), x + NX, ry + 32, g.tooExpensive ? P.bord3 : P.stone1);
+      }
       C.priceStands.forEach((st, k) => {
         const p = CC.priceFor(w, st.id), on = cur === st.id;
         UI.btn(app, ctx, `pr_${w.id}_${st.id}`, x + 150 + k * 50, ry + 2, 46, 16, R().euro(p), () => app.setPrice(w.id, st.id),
           { active: on, tone: st.id === 'woeker' ? 'bord' : st.id === 'scherp' ? 'green' : 'wood', tip: st.id === 'woeker' ? T.woekerTip : `${st.name}: ${R().euro(p)} (marge ${R().euro(p - cost)} per fles)` });
+        if (rich || mid) F().draw(ctx, '+' + R().euro(p - cost), x + 150 + k * 50 + 23, ry + 21, on ? P.ink : P.stone1, { align: 'center' });
       });
       types.forEach((k, j) => {
         const cs = plan.filter(p => p.type === k), ok = cs.filter(p => SIM.budgetOf(s, p) >= price).length, f = cs.length ? ok / cs.length : 0;
-        const cx = bx0 + j * bstep + 2, bh = 16;
+        const cx = bx0 + j * bstep + 2, bh = rich || mid ? Math.min(30, rowH - 12) : 16;
         R().rect(ctx, cx + 2, ry + 2, 7, bh, P.ink);
         R().rect(ctx, cx + 3, ry + 3, 5, bh - 2, P.cream1);
         const fh = Math.round((bh - 2) * f);

@@ -1009,8 +1009,33 @@
 
   // Plek voor een ballon zoeken dicht bij het hoofd (besluit 90): recht erboven, iets opzij of een stapje hoger.
   // Lukt dat niet zonder overlap met `placed` (andere ballonnen, het uithangbord, de bedragen), dan null: de ballon wacht.
+  // A5: nooit één los woord op een regel ("Hè, Crémant de Loire / op."). Bij twee regels zoeken we de breuk
+  // met de rustigste verdeling waarbij beide regels minstens twee woorden hebben; een woord met een
+  // koppelteken (Gevrey-Chambertin) mag na het koppelteken breken. Langere ballonnen: laatste woord meenemen.
+  R.bubbleLines = function (text) {
+    const F = CC.FONT, MAX = 110, lines = F.wrap(text, MAX);
+    if (lines.length === 2) {
+      const toks = [];   // { t, glue }: glue = vast aan het vorige stuk (na een koppelteken)
+      text.split(' ').forEach(wd => wd.split(/(?<=-)/).forEach((p, j) => toks.push({ t: p, glue: j > 0 })));
+      const join = arr => arr.map((k, i) => (i && !k.glue ? ' ' : '') + k.t).join('');
+      const words = arr => arr.filter(k => !k.glue).length;
+      let best = null;
+      for (let k = 1; k < toks.length; k++) {
+        const a = toks.slice(0, k), b = toks.slice(k).map((x, i) => (i ? x : { t: x.t, glue: false }));
+        const la = join(a), lb = join(b), wa = F.width(la), wb = F.width(lb);
+        if (wa > MAX || wb > MAX) continue;
+        const cost = Math.max(wa, wb) + (words(a) < 2 ? 200 : 0) + (words(b) < 2 && !toks[k].glue ? 200 : 0) + (toks[k].glue ? 20 : 0);
+        if (!best || cost < best.cost) best = { cost, l: [la, lb] };
+      }
+      if (best) return best.l;
+    } else if (lines.length > 2 && !lines[lines.length - 1].includes(' ')) {
+      const n = lines.length, prev = lines[n - 2], cut = prev.lastIndexOf(' ');
+      if (cut > 0) { const moved = prev.slice(cut + 1) + ' ' + lines[n - 1]; if (F.width(moved) <= MAX) { lines[n - 2] = prev.slice(0, cut); lines[n - 1] = moved; } }
+    }
+    return lines;
+  };
   R.bubbleFit = function (x, y, text, placed) {
-    const lines = CC.FONT.wrap(text, 110);
+    const lines = R.bubbleLines(text);
     const w = Math.max(...lines.map(l => CC.FONT.width(l))) + 8;
     const h = lines.length * 10 + 5;
     const free = (bx, by) => by >= 18 && !(placed || []).some(r => bx < r.x + r.w + 2 && bx + w + 2 > r.x && by < r.y + r.h + 4 && by + h + 4 > r.y);
@@ -1026,7 +1051,7 @@
     let bx, by, w, h, lines;
     if (fit) ({ bx, by, w, h, lines } = fit);
     else {   // geen vrije plek (alleen buiten de winkel gebruikt): gewoon boven het hoofd
-      lines = CC.FONT.wrap(text, 110); w = Math.max(...lines.map(l => CC.FONT.width(l))) + 8; h = lines.length * 10 + 5;
+      lines = R.bubbleLines(text); w = Math.max(...lines.map(l => CC.FONT.width(l))) + 8; h = lines.length * 10 + 5;
       bx = Math.max(2, Math.min(R.W - w - 2, Math.round(x - w / 2))); by = Math.max(18, Math.round(y - h - 5));
     }
     if (placed) placed.push({ x: bx, y: by, w, h });

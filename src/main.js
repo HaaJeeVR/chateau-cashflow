@@ -631,7 +631,10 @@
     const MAXB = 3, shown = app.bubblesShown || (app.bubblesShown = new Set());
     for (const b of shown) if (!heads.some(h => h.b === b)) shown.delete(b);
     heads.sort((a, b) => a.head[1] - b.head[1]);
-    if (!app.advice) {   // niet boven het adviesvenster uit
+    // A5: geen ballonnen zolang een venster met verduistering open is (advies, zondag, dagrapport, niveau, meldingen),
+    // anders steekt er een stukje tekst uit de wereld naast het venster uit
+    const modal = app.advice || !['prep', 'sale'].includes(app.phase) || (app.phase === 'prep' && (app.notice || app.mishapMsg || (s.mishap && !s.mishap.choice)));
+    if (!modal) {
       const fits = new Map();
       for (const h of heads) if (shown.has(h.b)) { const f = R.bubbleFit(h.head[0], h.head[1] - 1, h.b.text, placed); fits.set(h, f); if (f) placed.push({ x: f.bx, y: f.by, w: f.w, h: f.h }); }
       for (const h of heads) if (!shown.has(h.b) && shown.size < MAXB && h.b.t > 1.0) {
