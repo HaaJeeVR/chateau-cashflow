@@ -203,11 +203,13 @@ function botDay(s, bot, lastSold, e) {
     const demand = (lastSold[w.id] || 4) + (yest.soldOut || 0) * 1.5;
     want[w.id] = bot.restock === 'slim' ? Math.min(cap, Math.ceil(demand * (S.hired(s, 'sem') ? 1.6 : 1.3)) + 4) : 12;
   }
-  // bruiloft deze week: vanaf woensdag 24 flessen mousserend extra in huis (vrijdagochtend haalt het bruidspaar ze op)
+  // bruiloft deze week: vanaf woensdag 24 flessen mousserend extra in huis. Het bruidspaar haalt ze op als de winkel
+  // vrijdag opengaat (A3), dus op vrijdagochtend bestelt de bot de opdracht bovenop de gewone verkoop van die dag.
   const card = s.card && s.card.week === s.week ? CC.cardById(s.card.id) : null;
-  if (card && card.order && !s.card.orderDone && s.day >= card.order.day - 2 && s.day < card.order.day) {
+  if (card && card.order && !s.card.orderDone && s.day >= card.order.day - 2 && s.day <= card.order.day) {
     const bub = S.unlockedWines(s).filter(w => S.cardMatch(card.order.match, w)).sort((a, b) => CC.wineCost(a) - CC.wineCost(b))[0];
-    if (bub) want[bub.id] = Math.max(want[bub.id] || 0, card.order.n + (lastSold[bub.id] || 0) + (s.day === card.order.day - 1 ? 2 : 6));
+    if (bub) want[bub.id] = s.day === card.order.day ? (want[bub.id] || 0) + card.order.n
+      : Math.max(want[bub.id] || 0, card.order.n + (lastSold[bub.id] || 0) + (s.day === card.order.day - 1 ? 2 : 6));
   }
   const r = botOrder(s, want, reserve);
   if (s.week === 1) STAT.w1Short += r.trimmed ? 1 : 0;
