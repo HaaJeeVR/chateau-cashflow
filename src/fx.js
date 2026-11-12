@@ -175,15 +175,31 @@
     }
     return p.plan.length > 0;
   }
+  // Vanaf niveau 6 staat het terras (decor_terras, 5.6 / 9.0) over de linkerstoep: voorbijgangers lopen er dan
+  // aan de straatkant voorlangs (vóór de stoelpoten, achter het tweede paaltje), in plaats van door de stoelen.
+  const TERRAS_OM = [{ x: 3.9, y: 9.1 }, { x: 4.7, y: 10.6 }, { x: 8.1, y: 10.6 }, { x: 8.9, y: 9.1 }];
+  FX.terras = false;
+  function faceOf(a, b) {   // kijkrichting bij een stap van a naar b (op het scherm: links/rechts, naar je toe of van je af)
+    const dx = (b.x - b.y) - (a.x - a.y), dy = (b.x + b.y) - (a.x + a.y);
+    return { face: dx >= 0 ? 1 : -1, toward: dy > 0 };
+  }
+  function walk(lane, from, to) {   // loopstappen van from naar to, zo nodig om het terras heen
+    if (lane !== 'L' || !FX.terras || Math.min(from.x, to.x) > TERRAS_OM[0].x || Math.max(from.x, to.x) < TERRAS_OM[3].x) return [{ go: to, face: faceOf(from, to) }];
+    const pts = from.x < to.x ? TERRAS_OM : TERRAS_OM.slice().reverse(), steps = [];
+    let prev = from;
+    for (const q of [...pts, to]) { steps.push({ go: q, face: faceOf(prev, q) }); prev = q; }
+    return steps;
+  }
   function passerPlan(p, closed) {
-    const L = LANES[p.lane], go = { x: p.goal.x, y: p.goal.y };
+    const L = LANES[p.lane], start = { x: p.x, y: p.y }, go = { x: p.goal.x, y: p.goal.y };
     if (Math.random() < 0.35) {           // even stilstaan bij de etalage
-      const k = rnd(L.stop[0], L.stop[1]);
+      const hi = p.lane === 'L' && FX.terras ? Math.min(L.stop[1], TERRAS_OM[0].x - 0.2) : L.stop[1];
+      const k = rnd(L.stop[0], hi);
       const at = L.axis === 'y' ? { x: L.from.x, y: k } : { x: k, y: L.from.y };
       const look = { face: p.lane === 'R' ? -1 : 1, toward: false };
       const line = Math.random() < 0.45 ? pick(closed ? T().lookClosed : T().lookOpen) : null;
-      p.plan = [{ go: at }, { wait: rnd(1.4, 2.6), look, say: line }, { go, face: faceFor(p.lane, p.dir) }];
-    } else p.plan = [{ go }];
+      p.plan = [...walk(p.lane, start, at), { wait: rnd(1.4, 2.6), look, say: line }, ...walk(p.lane, at, go)];
+    } else p.plan = walk(p.lane, start, go);
   }
   const T = () => CC.TEXT.street;
 
@@ -235,8 +251,7 @@
     if (!FX.bike) {
       FX.nextBike -= dt;
       if (FX.nextBike > 0 || !bikeReady(images)) return;
-      const terras = s && CC.SIM.activeFurniture(s).some(f => f.id === 'decor_terras');
-      const free = ['R', 'L'].filter(l => !laneBusy(l) && !(l === 'L' && terras));
+      const free = ['R', 'L'].filter(l => !laneBusy(l) && !(l === 'L' && FX.terras));
       if (!free.length) { FX.nextBike = 2; return; }
       const lane = pick(free), dir = Math.random() < 0.5 ? 1 : -1, L = BIKE_LANES[lane];
       const A = dir > 0 ? L.from : L.to, B = dir > 0 ? L.to : L.from, len = Math.hypot(B.x - A.x, B.y - A.y);
@@ -279,6 +294,7 @@
   FX.street = function (dt, phase, images, s) {
     const open = phase === 'sale', closed = phase === 'prep';
     if (!open && !closed) { FX.passers = []; FX.critter = null; FX.joke = null; FX.bike = null; return []; }
+    FX.terras = !!(s && CC.SIM.activeFurniture(s).some(f => f.id === 'decor_terras'));
     // voorbijgangers
     FX.nextPasser -= dt;
     if (FX.nextPasser <= 0 && FX.passers.length < 3) {
