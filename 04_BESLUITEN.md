@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-11-12 — Pakket B (vervolg)
+
+| # | Besluit | Reden |
+|---|---|---|
+| 97 | **Nieuwe figuren uit bladen; tegels uit de sprites (B2).** Alle 21 klanten en personeelsleden zijn opnieuw gemaakt uit bladen van 2 × 3 (`art_bronnen/personages/bladen_2026-11-12`, `tools/import_bladen.py`): per figuur staand + twee stappen, voor en achter, kaders 27–48 px breed, bovenlijf in het midden van het kader. Kijkrichting in `CC.SPRITE_FACING`: voor kijkt links, achter loopt rechts weg. De figuurtegels van het niveauscherm (klanttype = twee varianten, personeel = één figuur, „+klanten" = drie) komen voortaan uit de staande spelsprites op ware grootte met 1 px donkere rand (`tools/build_figuurtegels.py`, draait mee met `build_tiles.py`, dat alleen nog de vier dingen uit `tegels_bron.png` maakt). Het personeelsvenster toont dezelfde figuurtegel in een lijstje i.p.v. het geschilderde portret; de portretten blijven voor de level-up van personeel en de meldingen. Voorbijgangers kiezen uit alle 18 klantfiguren (was een vaste lijst van 10). | Eén gezicht per figuur in winkel, niveauscherm en personeelsvenster; geen schalen, dus geen vage pixels. |
+
+---
+
 ## 2026-11-11 — Pakket B
 
 | # | Besluit | Reden |

@@ -360,12 +360,13 @@
 
   // Kijkrichting van de gegenereerde sprites (-1 = links, 1 = rechts); wordt gespiegeld naar de looprichting.
   CC.SPRITE_FACING = {
-    buurt: { front: -1, back: -1 }, koopjes: { front: -1, back: -1 },
-    liefhebber: { front: -1, back: 1 }, snob: { front: -1, back: -1 },
-    sem: { front: -1, back: -1 }, fatima: { front: -1, back: -1 }, dubois: { front: -1, back: -1 },
-    // varianten (besluit 64): vooraanzicht kijkt linksvoor, achteraanzicht loopt iets naar rechts weg
-    buurt2: { front: -1, back: 1 }, buurt3: { front: -1, back: 1 }, koopjes2: { front: -1, back: 1 },
-    liefhebber2: { front: -1, back: 1 }, liefhebber3: { front: -1, back: 1 }, snob2: { front: -1, back: 1 },
+    // alle figuren uit de bladen van 2026-11-12: vooraanzicht kijkt linksvoor, achteraanzicht loopt naar rechts weg
+    buurt: { front: -1, back: 1 }, buurt2: { front: -1, back: 1 }, buurt3: { front: -1, back: 1 }, buurt4: { front: -1, back: 1 },
+    buurt5: { front: -1, back: 1 }, buurt6: { front: -1, back: 1 }, buurt7: { front: -1, back: 1 }, koopjes: { front: -1, back: 1 },
+    koopjes2: { front: -1, back: 1 }, koopjes3: { front: -1, back: 1 }, liefhebber: { front: -1, back: 1 }, liefhebber2: { front: -1, back: 1 },
+    liefhebber3: { front: -1, back: 1 }, liefhebber4: { front: -1, back: 1 }, liefhebber5: { front: -1, back: 1 }, snob: { front: -1, back: 1 },
+    snob2: { front: -1, back: 1 }, snob3: { front: -1, back: 1 }, sem: { front: -1, back: 1 }, fatima: { front: -1, back: 1 },
+    dubois: { front: -1, back: 1 },
   };
 
   // Staplek voor klanten per schap (voor het schap)

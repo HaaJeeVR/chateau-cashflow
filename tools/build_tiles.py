@@ -3,7 +3,8 @@
 #          rij 1: kast, koeling (ijsemmer), vitrine (proeftafel), uithangbord
 #          rij 2: crowd (groepje klanten), buurt, koopjes, liefhebber
 #          rij 3: snob, sem, fatima, dubois
-# Uitvoer: assets/tile_<naam>.png  (past in het tegelvak, ± 80 × 72)
+# Uitvoer: assets/tile_<naam>.png  (past in het tegelvak, ± 80 × 72) — alleen de vier dingen; de figuren (rij 2 en 3)
+#          komen sinds besluit 97 uit de spelsprites via tools/build_figuurtegels.py, dat hieronder vanzelf meedraait
 #          assets/icon_<naam>.png  (alleen de vier upgrades; past in het icoonvak, ± 34 × 34)
 #          assets/tiles.js
 # Draaien: python tools/build_tiles.py
@@ -71,6 +72,7 @@ def fit(b, bw, bh):
 meta = {'tiles': {}, 'icons': {}}
 for names, ks in zip(ROWS, rows):
     for name, k in zip(names, ks):
+        if name not in ICONS: continue   # figuren: zie build_figuurtegels.py
         t = fit(box[k], TILE_W, TILE_H); fn = f'tile_{name}.png'; t.save(os.path.join(OUT, fn))
         meta['tiles'][name] = {'src': 'assets/' + fn, 'w': t.width, 'h': t.height}
         if name in ICONS:
@@ -79,3 +81,4 @@ for names, ks in zip(ROWS, rows):
 open(os.path.join(OUT, 'tiles.js'), 'w').write('// gegenereerd door tools/build_tiles.py\n(window.CC = window.CC || {}).TILES = '
     + json.dumps(meta['tiles']) + ';\nCC.ICONS = ' + json.dumps(meta['icons']) + ';\n')
 print({k: f"{v['w']}x{v['h']}" for k, v in {**meta['tiles'], **{'icon_' + a: b for a, b in meta['icons'].items()}}.items()})
+import runpy; runpy.run_path(os.path.join(ROOT, 'tools', 'build_figuurtegels.py'), run_name='__main__')

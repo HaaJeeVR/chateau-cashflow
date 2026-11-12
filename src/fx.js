@@ -137,7 +137,8 @@
     R: { from: { x: 9.6, y: -3.2 }, to: { x: 9.6, y: 10.6 }, stop: [3.2, 6.8], axis: 'y' },
     L: { from: { x: -3.6, y: 9.1 }, to: { x: 9.8, y: 9.1 }, stop: [1.8, 5.2], axis: 'x' },
   };
-  const LOOKS = ['buurt', 'buurt2', 'buurt3', 'koopjes', 'koopjes2', 'liefhebber', 'liefhebber2', 'liefhebber3', 'snob', 'snob2'];
+  // alle klantfiguren uit het manifest (geen personeel); zonder manifest de vier basistypen
+  const LOOKS = Object.keys(CC.CUSTOMER_TYPES || {}).flatMap(t => (CC.SPRITE_VARIANTS || {})[t] || [t]);
   const DOOR_OUT = { x: 8.55, y: 5.4 };
   FX.passers = []; FX.nextPasser = 2; FX.jokeOrder = [];
   const rnd = (a, b) => a + Math.random() * (b - a);

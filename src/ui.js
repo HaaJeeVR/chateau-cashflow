@@ -1036,10 +1036,15 @@
       R().round(ctx, x + 8, y, PW - 16, h, 6, hired ? P.cream3 : P.cream1);
       if (hired) R().rect(ctx, x + 8, y, 2, h, P.green3);
       ctx.globalAlpha = unlocked ? 1 : 0.35;
-      const hasPor = UI.hasPortrait(app, id);
-      if (hasPor) UI.portrait(app, ctx, id, 'neutral', x + 15, y + 8, 40); else UI.staffSprite(app, ctx, id, x + 14, y + 14);
+      // dezelfde figuur als in de winkel en op het niveauscherm (tile_<id>, besluit 97), op ruitjes in een lijstje
+      const ti = app.images['tile_' + id], hasTile = !!(ti && ti.complete && ti.naturalWidth);
+      if (hasTile) {
+        R().round(ctx, x + 14, y + 8, 42, 76, 5, P.gold); R().round(ctx, x + 15, y + 9, 40, 74, 4, R().pattern(ctx, 'lattice', x + 15, y + 9));
+        R().round(ctx, x + 21, y + 77, 28, 4, 2, 'rgba(122,74,36,0.25)');
+        ctx.drawImage(ti, Math.round(x + 35 - ti.naturalWidth / 2), y + 80 - ti.naturalHeight);
+      } else UI.staffSprite(app, ctx, id, x + 14, y + 14);
       ctx.globalAlpha = 1;
-      const tx = hasPor ? x + 62 : x + 48;
+      const tx = hasTile ? x + 62 : x + 48;
       F().draw(ctx, st.name, tx, y + 6, unlocked ? P.ink : P.stone1);
       F().draw(ctx, st.role + ' · ' + R().euro(st.wage) + ' per dag', tx, y + 16, P.stone1);
       F().wrap(st.desc, PW - 24 - (tx - x)).slice(0, 2).forEach((l, i) => F().draw(ctx, l, tx, y + 28 + i * 10, unlocked ? P.ink : P.stone1));
