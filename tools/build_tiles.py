@@ -69,14 +69,23 @@ def fit(b, bw, bh):
     big_ = np.zeros((h + 2, w + 2, 4), np.uint8); big_[1:-1, 1:-1] = arr; big_[ring] = (*INK, 255)
     return Image.fromarray(big_, 'RGBA')
 
+def save_same(img, path):
+    """Alleen schrijven als de pixels echt anders zijn. De beelden in assets/ dragen soms metadata (C2PA-blok `caBX`,
+    meegekomen bij het overzetten van bestanden); opnieuw opslaan haalt die weg en git ziet dan een gewijzigd bestand,
+    terwijl elke pixel gelijk is."""
+    if os.path.exists(path):
+        old = Image.open(path).convert('RGBA')
+        if old.size == img.size and np.array_equal(np.array(old), np.array(img.convert('RGBA'))): return
+    img.save(path)
+
 meta = {'tiles': {}, 'icons': {}}
 for names, ks in zip(ROWS, rows):
     for name, k in zip(names, ks):
         if name not in ICONS: continue   # figuren: zie build_figuurtegels.py
-        t = fit(box[k], TILE_W, TILE_H); fn = f'tile_{name}.png'; t.save(os.path.join(OUT, fn))
+        t = fit(box[k], TILE_W, TILE_H); fn = f'tile_{name}.png'; save_same(t, os.path.join(OUT, fn))
         meta['tiles'][name] = {'src': 'assets/' + fn, 'w': t.width, 'h': t.height}
         if name in ICONS:
-            t = fit(box[k], ICON_W, ICON_H); fn = f'icon_{name}.png'; t.save(os.path.join(OUT, fn))
+            t = fit(box[k], ICON_W, ICON_H); fn = f'icon_{name}.png'; save_same(t, os.path.join(OUT, fn))
             meta['icons'][name] = {'src': 'assets/' + fn, 'w': t.width, 'h': t.height}
 open(os.path.join(OUT, 'tiles.js'), 'w').write('// gegenereerd door tools/build_tiles.py\n(window.CC = window.CC || {}).TILES = '
     + json.dumps(meta['tiles']) + ';\nCC.ICONS = ' + json.dumps(meta['icons']) + ';\n')
