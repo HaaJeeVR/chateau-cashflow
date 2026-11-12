@@ -319,6 +319,7 @@
     postmortem: {
       title: 'Wat ging er mis in week {week}',
       short: 'Je kwam {short} tekort voor de termijn van {due}.',
+      cashOut: '{n} klanten stonden voor een leeg schap: er was geen geld om bij te bestellen.',
       soldOut: '{n} klanten wilden een wijn die op was{wine}.',
       tooExpensive: '{n} klanten vonden het te duur{wine}.',
       nothing: '{n} klanten vonden niets naar hun smaak.',

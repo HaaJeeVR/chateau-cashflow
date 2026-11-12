@@ -65,6 +65,26 @@ const server = http.createServer((req, res) => {
   const got = await ev(() => ({ gev: CC.SIM.totalBottles(app.s, 'wine_gevrey'), cha: CC.SIM.totalBottles(app.s, 'wine_champagne') }));
   check('na Bestellen: 4 Gevrey en 8 Champagne in huis', got.gev === 4 && got.cha === 8, JSON.stringify(got));
 
+  // ---------- A2: failliet-scherm noemt de prijs ----------
+  console.log('A2: failliet met alles op "stevig" noemt de prijs als eerste');
+  const pmA2 = await ev(() => {
+    const S = CC.SIM, s = CC.newState(4); const ids = ['wine_merlot', 'wine_sauvignon', 'wine_provence', 'wine_rioja'];
+    ids.forEach((w, k) => { s.prices[w] = 'stevig'; s.targets[w] = 12; S.assignVak(s, 'vak_' + (k + 1), w); });
+    s.flags.introSeen = true;
+    for (let g = 0; g < 20 && s.status === 'playing'; g++) {
+      for (s.day = 0; s.day < CC.CONFIG.daysPerWeek; s.day++) {
+        S.refill(s); S.placeOrder(s, S.orderProposal(s)); S.unlockedWines(s).forEach(w => { s.prices[w.id] = 'stevig'; });
+        const d = CC.DAY.start(s); CC.DAY.finish(d, s); S.endDay(s, d.log);
+      }
+      const r = S.payWeek(s); if (!r.ok && !S.postpone(s).ok) { S.bankrupt(s); break; } if (r.won) break;
+      S.startWeek(s); s.mishap = null; s.card = null;
+    }
+    app.s = s; app.rebuildRoom(); app.setPhase('gameover');
+    return s.status === 'bankrupt' && S.postmortem(s).lines.map(l => l.key);
+  });
+  check('failliet, eerste regel = te duur', pmA2 && pmA2[0] === 'tooExpensive', String(pmA2));
+  await wait(3500); await shot('A2-failliet-prijs');
+
   check('geen fouten in de console', errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close(); server.close();
   console.log(fails ? `\n${fails} FOUT(EN)` : '\nAlles groen.');

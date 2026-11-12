@@ -798,27 +798,41 @@
   };
   SIM.bankrupt = function (s) { s.bust = { week: s.week, due: SIM.weekDue(s), cash: s.cash }; s.status = 'bankrupt'; };
   // Failliet: wat ging er mis? (fase 3d, besluit 77) Twee feitelijke regels over de laatste week, de zwaarste (in euro's) eerst.
+  // A2 (handoff na review 2): verloren klanten tellen tegen de marge per koper, "te duur" weegt even zwaar als "op",
+  // en "op" op een dag dat er geen geld was om bij te bestellen heet "lege kas" in plaats van een wijn te noemen.
+  // "Te weinig marge per dag" is een gevolg, geen oorzaak: die regel komt pas als er niets concreters is.
   SIM.postmortem = function (s) {
     const b = s.bust || { week: s.week, due: 0, cash: s.cash };
-    const wk = s.history.filter(h => h.week === b.week);
+    let wk = s.history.filter(h => h.week === b.week);
+    if (!wk.length) wk = s.history.slice(-C().daysPerWeek);
     const sum = f => wk.reduce((a, h) => a + (f(h) || 0), 0);
     const days = Math.max(1, wk.length);
-    const bottles = sum(h => h.bottles), margin = sum(h => h.margin);
-    const perBottle = bottles ? margin / bottles : 3;
+    const bottles = sum(h => h.bottles), margin = sum(h => h.margin), buyers = sum(h => h.buyers);
+    const perBuyer = buyers ? margin / buyers : (bottles ? margin / bottles : 4);
     const out = [];
-    const soldOut = sum(h => h.soldOut), tooExp = sum(h => h.tooExpensive), nothing = sum(h => h.nothing);
-    // welke wijn was het vaakst op / te duur?
-    const byWine = k => { const m = {}; for (const h of wk) for (const id in h.wines || {}) m[id] = (m[id] || 0) + (h.wines[id][k] || 0); const top = Object.keys(m).sort((x, y) => m[y] - m[x])[0]; return top && m[top] ? CC.wineById(top).name : null; };
-    if (soldOut) out.push({ key: 'soldOut', n: soldOut, wine: byWine('soldOut'), loss: soldOut * perBottle * 0.8 });
-    if (tooExp) out.push({ key: 'tooExpensive', n: tooExp, wine: byWine('tooExpensive'), loss: tooExp * perBottle * 0.6 });
-    if (nothing >= 5) out.push({ key: 'nothing', n: nothing, loss: nothing * perBottle * 0.4 });
+    // lege kas: 's ochtends te weinig geld om de wijnen die op raakten bij te bestellen (6 flessen elk), en dat ook niet gedaan
+    const broke = h => {
+      if (!h.soldOut) return false;
+      const morning = h.cash + (h.rent || 0) + (h.wages || 0) + (h.bought || 0) + (h.invest || 0) - (h.revenue || 0) - (h.tips || 0);
+      let need = 0; for (const id in h.wines || {}) if (h.wines[id].soldOut) need += 6 * CC.wineCost(CC.wineById(id));
+      return need > 0 && morning < need && (h.bought || 0) < need;
+    };
+    const cashOut = sum(h => (broke(h) ? h.soldOut : 0));
+    const soldOut = sum(h => (broke(h) ? 0 : h.soldOut)), tooExp = sum(h => h.tooExpensive), nothing = sum(h => h.nothing);
+    // welke wijn was het vaakst op / te duur? (alleen dagen die meetellen)
+    const byWine = (k, keep) => { const m = {}; for (const h of wk) if (!keep || keep(h)) for (const id in h.wines || {}) m[id] = (m[id] || 0) + (h.wines[id][k] || 0); const top = Object.keys(m).sort((x, y) => m[y] - m[x])[0]; return top && m[top] ? CC.wineById(top).name : null; };
+    if (cashOut) out.push({ key: 'cashOut', n: cashOut, loss: cashOut * perBuyer * 0.8 });
+    if (soldOut) out.push({ key: 'soldOut', n: soldOut, wine: byWine('soldOut', h => !broke(h)), loss: soldOut * perBuyer * 0.8 });
+    if (tooExp) out.push({ key: 'tooExpensive', n: tooExp, wine: byWine('tooExpensive'), loss: tooExp * perBuyer * 0.8 });
+    if (nothing >= 5) out.push({ key: 'nothing', n: nothing, loss: nothing * perBuyer * 0.4 });
     const stockVal = CC.WINES.reduce((a, w) => a + SIM.totalBottles(s, w.id) * CC.wineCost(w), 0);
     if (stockVal > 60) out.push({ key: 'stock', value: stockVal, loss: stockVal * 0.5 });
     const inv = sum(h => h.invest); if (inv > 0) out.push({ key: 'invest', value: inv, loss: inv });
     const wages = sum(h => h.wages); if (wages > 0) out.push({ key: 'wages', value: wages, loss: wages * 0.7 });
-    if (wk.length) out.push({ key: 'margin', perDay: margin / days, need: b.due / 6, loss: Math.max(0, b.due / 6 - margin / days) * days * 0.5 });
     out.sort((x, y) => y.loss - x.loss);
-    return { short: Math.max(0, b.due - b.cash), due: b.due, week: b.week, lines: out.slice(0, 2) };
+    const lines = out.filter(l => l.loss >= 1).slice(0, 2);
+    if (lines.length < 2 && wk.length) lines.push({ key: 'margin', perDay: margin / days, need: b.due / 6, loss: 0 });
+    return { short: Math.max(0, b.due - b.cash), due: b.due, week: b.week, lines: lines.slice(0, 2) };
   };
   SIM.startWeek = function (s) {
     s.week++; s.day = 0; s.weekBought = {}; s.sun = null;

@@ -79,5 +79,33 @@ console.log('F3-4: failliet: wat ging er mis, en de bankier');
   check('bankier heeft genoeg variatie', B.ok.length >= 6 && B.tight.length >= 5 && B.short.length >= 4 && B.paid.length >= 5 && B.bankrupt.length >= 3 && B.postponeOffer.length >= 3);
 }
 
+console.log('F3-5: failliet-analyse noemt de echte oorzaak (A2, handoff na review 2)');
+{
+  // alles op "stevig", geen advies, elke ochtend Ronnies voorstel tot 12: de prijs moet bovenaan staan
+  const s = CC.newState(4); const ids = ['wine_merlot', 'wine_sauvignon', 'wine_provence', 'wine_rioja'];
+  ids.forEach((w, k) => { s.prices[w] = 'stevig'; s.targets[w] = 12; S.assignVak(s, 'vak_' + (k + 1), w); });
+  let guard = 0;
+  while (s.status === 'playing' && guard++ < 20) {
+    for (s.day = 0; s.day < CC.CONFIG.daysPerWeek; s.day++) {
+      S.refill(s); S.placeOrder(s, S.orderProposal(s));
+      S.unlockedWines(s).forEach(w => { s.prices[w.id] = 'stevig'; });
+      const d = CC.DAY.start(s); CC.DAY.finish(d, s); S.endDay(s, d.log);
+    }
+    const r = S.payWeek(s);
+    if (!r.ok && !S.postpone(s).ok) { S.bankrupt(s); break; }
+    if (r.won) break;
+    S.startWeek(s); s.mishap = null; s.card = null;
+  }
+  const pm = s.status === 'bankrupt' ? S.postmortem(s) : null;
+  check('run op "stevig" gaat failliet', !!pm, s.status + ' week ' + s.week);
+  check('de prijs staat bovenaan', pm && pm.lines[0].key === 'tooExpensive', pm && pm.lines.map(l => l.key + ' ' + Math.round(l.loss)).join(', '));
+  // lege kas: wijn op op dagen dat er geen geld was om bij te bestellen → geen wijn noemen, maar de kas
+  const t = CC.newState(5); t.week = 4; t.bust = { week: 4, due: 360, cash: 10 };
+  for (let d = 0; d < 6; d++) t.history.push({ week: 4, day: d, revenue: 40, cogs: 20, margin: 20, rent: 20, wages: 0, tips: 0, bought: 0, invest: 0, cash: 10, bottles: 5, buyers: 4, customers: 30, soldOut: 15, tooExpensive: 2, nothing: 0, wines: { wine_merlot: { soldOut: 15, tooExpensive: 2 } } });
+  const pm2 = S.postmortem(t);
+  check('lege kas wint van "wijn op"', pm2.lines[0].key === 'cashOut' && !pm2.lines.some(l => l.key === 'soldOut'), pm2.lines.map(l => l.key).join(','));
+  check('regel lege kas heeft een tekst', !!CC.TEXT.postmortem.cashOut);
+}
+
 console.log(fails ? `\n${fails} test(s) fout.` : '\nAlles groen.');
 process.exit(fails ? 1 : 0);
