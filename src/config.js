@@ -182,7 +182,7 @@
     sem: { name: 'Sem', role: 'Vakkenvuller', get wage() { return CC.CONFIG.staffWage.sem; }, minLevel: 2, home: { x: 6.1, y: 1.45 },
       desc: 'Stagiair. Deelt folders uit, veegt de stoep en vult overdag lege schappen bij.',
       pct: lv => '+' + CC.CONFIG.semCustomers[lv - 1],
-      perk: lv => `${CC.STAFF.sem.pct(lv)} klant${lv > 1 ? 'en' : ''} per dag, vult bij`,
+      perk: lv => `${CC.STAFF.sem.pct(lv)} klant${CC.CONFIG.semCustomers[lv - 1] === 1 ? '' : 'en'} per dag, vult bij`,   // enkelvoud alleen bij 1
       look: { body: '#5e8a5f', body2: '#2f5541', legs: '#45566b', hair: '#d9a25c', skin: 'skin1', prop: null } },
     fatima: { name: 'Fatima', role: 'Verkoper', get wage() { return CC.CONFIG.staffWage.fatima; }, minLevel: 5, home: { x: 4.35, y: 5.35 },
       desc: 'Klanten die weglopen, krijgen van haar een tweede kans.',
