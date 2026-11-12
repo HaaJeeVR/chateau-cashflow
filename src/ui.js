@@ -1899,7 +1899,7 @@
     // Ronnie
     UI.portrait(app, ctx, 'leverancier', 'neutral', x + 14, y + 32, 40);
     const total = Object.values(order).reduce((a, b) => a + (b || 0), 0);
-    let say = blocked ? T.blocked : vakMode ? T.forVak.split('{n}').join(CC.vakNumber(vakMode)) : app.orderMsg ? app.orderMsg : total > 0 ? T.proposal : T.empty;
+    let say = blocked ? T.blocked : vakMode ? T.forVak.split('{n}').join(CC.vakNumber(vakMode)) : app.orderMsg ? app.orderMsg : app.proposed ? T.proposal : !s.history.length ? T.first : T.empty;   // A4: alleen "aangevuld" als Ronnie echt iets voorstelde
     const bw = AW - 86, name = 'Ronnie:', lines = F().wrap(name + ' ' + say, bw - 16).slice(0, 3);
     R().round(ctx, x + 62, y + 32, bw, 12 + lines.length * 10, 5, P.ink);
     R().round(ctx, x + 63, y + 33, bw - 2, 10 + lines.length * 10, 4, '#fffaf0');

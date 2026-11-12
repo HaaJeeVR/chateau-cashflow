@@ -486,10 +486,11 @@
   // Ochtendlevering: goedkoopste wijnen eerst (zo blijft de basis op voorraad als het geld krap is)
   // ---------- Ochtendbestelling ter goedkeuring (besluit 66, 1B) ----------
   // Ronnie stelt voor: per wijn aanvullen tot de lijst van de vorige bestelling (target). De speler past aan en bestelt.
+  // A4: wijnen zonder schap stelt hij niet voor (die zou je anders elke ochtend op 0 moeten zetten).
   SIM.orderProposal = function (s) {
     const out = {};
     for (const w of SIM.unlockedWines(s)) {
-      const t = SIM.target(s, w.id); if (!t) continue;
+      const t = SIM.target(s, w.id); if (!t || !SIM.vakOfWine(s, w.id)) continue;
       const n = Math.min(Math.max(0, t - SIM.totalBottles(s, w.id)), SIM.scarceLeft(s, w.id));
       if (n > 0) out[w.id] = n;
     }

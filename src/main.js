@@ -292,6 +292,7 @@
     // Ronnie zet de bestelling klaar; er gaat pas geld af als je op "Bestellen" drukt (besluit 66, 1B)
     app.delivery = null; app.ordered = false;
     app.order = SIM.orderProposal(app.s);
+    app.proposed = Object.keys(app.order).length > 0;   // A4: heeft Ronnie iets klaargezet?
     // nieuw vrijgespeelde schaarse wijn: één keer uitleggen
     const seen = app.s.flags.scarceSeen || [];
     const sc = SIM.unlockedWines(app.s).find(w => CC.roleById(w.role).scarce && !seen.includes(w.id));
@@ -350,6 +351,7 @@
     if (!r.deliveries.length) return;
     app.delivery = r; app.ordered = true;
     app.order = SIM.orderProposal(app.s);
+    app.proposed = Object.keys(app.order).length > 0;   // A4: heeft Ronnie iets klaargezet?
     app.s.flags.bought = true; if (SIM.listed(app.s).length) app.s.flags.shelved = true;
     if (CC.FX) CC.FX.sparkle(app.mouse.x, app.mouse.y, P.gold2, 10);
     app.save();

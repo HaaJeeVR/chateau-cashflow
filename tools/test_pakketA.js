@@ -96,7 +96,7 @@ const server = http.createServer((req, res) => {
     s.card = { id: 'bruiloft', week: s.week }; s.day = 3; app.startPrep();
   });
   await closeNotices();
-  await ev(() => { app.openShop(); app.skipDay(); });
+  await ev(() => { app.openShop(); app.skipDay(); }); await frames(4);
   const rem = await ev(() => { const po = CC.SIM.pendingOrder(app.s); return po && app.summary.day === po.day - 1 && po.have < po.need; });
   check('donderdag: herinnering in het dagrapport', rem);
   await ev(() => { app.resultT = 3; }); await wait(300); await shot('A3-donderdag-herinnering');
@@ -116,6 +116,30 @@ const server = http.createServer((req, res) => {
   await shot('A3-bruiloft-gelukt');
   await click('notice_ok');
   check('melding weg: de winkel gaat meteen open', (await ev(() => app.phase)) === 'sale');
+
+  // ---------- A4: Ronnies voorstel ----------
+  console.log('A4: Ronnie stelt geen wijnen zonder schap voor; eigen zin op dag 1');
+  await ev(() => { app.newGame(); app.s.flags.introSeen = true; app.startPrep(); });
+  await closeNotices();
+  check('dag 1: Ronnie heeft niets klaargezet', (await ev(() => app.proposed)) === false);
+  await click('w_phone'); await wait(500); await click('op_wine_merlot'); await click('op_wine_sauvignon');
+  check('na +6: nog steeds geen "aangevuld"-zin', (await ev(() => !app.proposed && !app.s.history.length && !app.orderMsg)));
+  await shot('A4-dag1-ronnie');
+  await click('place_order');
+  await ev(() => {
+    app.openShop(); app.skipDay();
+  });
+  await frames(4);
+  const a4 = await ev(() => {
+    const s = app.s; app.resultT = 9; app.afterResult();
+    while (app.notice) app.closeNotice();
+    // sauvignon van het schap halen: morgen niet meer voorstellen
+    const v = CC.SIM.vakOfWine(s, 'wine_sauvignon'); if (v) CC.SIM.assignVak(s, v, null);
+    s.stock.wine_merlot = 0; for (const k in s.vakken) if (s.vakken[k].wine) s.vakken[k].n = 0; s.stock.wine_sauvignon = 0;
+    app.startPrep();
+    return { o: app.order, p: app.proposed };
+  });
+  check('wijn zonder schap niet in het voorstel', !a4.o.wine_sauvignon && a4.o.wine_merlot > 0 && a4.p, JSON.stringify(a4));
 
   check('geen fouten in de console', errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close(); server.close();

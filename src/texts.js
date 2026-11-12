@@ -169,6 +169,7 @@
     assort: {
       proposal: 'Ik heb aangevuld tot je lijst van gisteren. Kijk even, en zeg het maar.',
       empty: 'Wat mag het zijn? Per zes of per twaalf, ik lever direct.',
+      first: 'Je eerste bestelling. Per zes of per twaalf, ik lever direct. Morgen stel ik voor aan te vullen tot wat je nu neemt.',
       done: 'Komt eraan. Nog iets?',
       blocked: 'Mijn busje staat bij de wegsleepdienst. Woensdag ben ik er weer.',
       forVak: 'Wat moet er in schap {n}? Kies een wijn, of bestel er eentje bij.',
