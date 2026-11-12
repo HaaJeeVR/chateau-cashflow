@@ -37,6 +37,8 @@
   if (CC.ICONS) for (const k in CC.ICONS) loadImg('icon_' + k, CC.ICONS[k].src);
   if (CC.DECOR_TILES) for (const lv in CC.DECOR_TILES) loadImg('tile_decor' + lv, CC.DECOR_TILES[lv]);
   if (CC.INTRO_ART) for (const k in CC.INTRO_ART) loadImg('intro_' + k, CC.INTRO_ART[k].src);
+  loadImg('fg_straat', 'assets/fg_straat.png');   // lantaarnpaal en paaltjes vóór de figuren op straat (besluit 98)
+  if (CC.FX && CC.FX.BIKE_SRC) for (const k in CC.FX.BIKE_SRC) loadImg('fiets_' + k, CC.FX.BIKE_SRC[k]);   // fietser (besluit 98); ontbreekt een beeld, dan rijdt ze niet
   // Eindbeeld failliet (B3): bestaat assets/rolluik.png, dan vervangt hij vanzelf het getekende rolluik (besluit 94).
   { const rl = new Image(); rl.onerror = () => { app.images.rolluik = null; }; rl.src = 'assets/rolluik.png'; app.images.rolluik = rl; }
   CC.IMAGES = app.images;
@@ -568,7 +570,7 @@
     }
     for (const a of staff || []) items.push({ depth: a.x + a.y, c: a });
     // buiten: voorbijgangers; als de winkel dicht is ook kat en muis, te laat, dutje (M7b)
-    if (CC.FX && PAINT) for (const it of CC.FX.street(dt, app.phase)) items.push(it);
+    if (CC.FX && PAINT) for (const it of CC.FX.street(dt, app.phase, app.images, app.s)) items.push(it);
     items.sort((a, b) => a.depth - b.depth);
     const shelves = [];
     const heads = [];
@@ -596,12 +598,17 @@
         else if (f.kind === 'umbrellas') R.drawUmbrellas(ctx, f);
       } else if (it.critter) {
         CC.FX.drawCritter(ctx, it.critter);
+      } else if (it.bike) {
+        const head = CC.FX.drawBike(ctx, it.bike, app.images);
+        if (head && it.bike.bubble) heads.push({ head, b: it.bike.bubble, c: it.bike });
       } else {
         const head = R.drawCustomerSprite(ctx, it.c, app.images) || R.drawCustomer(ctx, it.c, app.t);
         if (it.c.bubble) heads.push({ head, b: it.c.bubble, c: it.c });
         if (it.c.state === 'ask') asks.push({ head, c: it.c });
       }
     }
+    // voorgrond van de straat: paal en paaltjes staan vóór de stoep, dus over voorbijgangers en fietser heen
+    const fg = app.images.fg_straat; if (PAINT && fg && fg.complete && fg.naturalWidth) ctx.drawImage(fg, 0, 0);
     app.worldRects.shelves = shelves;
     if (PAINT) { if (hover === 'w_counter') R.hoverBox(ctx, CC.BG.register); if (hover === 'w_phone') R.hoverBox(ctx, CC.BG.phone); }
     if (PAINT && hover === 'w_vitrine' && CC.BG_LAYERS && app.images.layer_table) { const TL = CC.BG_LAYERS.table, im = app.images.layer_table; R.hoverBox(ctx, { x: TL.x + 6, y: TL.y, w: im.naturalWidth - 12, h: Math.round(im.naturalHeight * 0.6) }); }

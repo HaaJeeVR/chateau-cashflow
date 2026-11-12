@@ -36,6 +36,7 @@
       late: ['Dicht?!', 'Nee hè. Dicht.', 'Hallo? Iemand?'],
       lateBye: ['Morgen dan maar.', 'Zucht.', 'Ik kom terug!', 'Dan maar water.'],
       nap: 'Zzz',
+      bell: 'Tring!',   // fietser (besluit 98)
     },
     tutorial: {
       introTitle: 'Gefeliciteerd met uw winkel',

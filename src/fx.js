@@ -214,22 +214,87 @@
     return [{ kind: 'cat', x: k.x, y: k.y, face: -1, ph: j.t * 5 }];
   }
 
+  // ---------- Fietser (besluit 79/80, 98): af en toe langs, puur beeld, geen invloed op de sim ----------
+  // Rijdt over dezelfde twee stoepen als de voorbijgangers, iets naar de straatkant (rechts vóór het stoepbord langs),
+  // en alleen over een stoep waar op dat moment niemand loopt; zolang ze rijdt komt er op die stoep niemand bij.
+  // Links gaat ze achter de lantaarnpaal en de paaltjes langs (assets/fg_straat.png komt eroverheen); vanaf niveau 6
+  // staat daar het terras over de hele stoep, dan rijdt ze alleen rechts.
+  FX.BIKE_SRC = { voor_1: 'assets/fietser_voor_1.png', voor_2: 'assets/fietser_voor_2.png',
+    achter_1: 'assets/fietser_achter_1.png', achter_2: 'assets/fietser_achter_2.png' };
+  const BIKE_LANES = {
+    R: { from: { x: 10.9, y: -2.6 }, to: { x: 10.9, y: 13.2 } },    // vóór het stoepbord langs (9.4, 3.4)
+    L: { from: { x: -4.4, y: 9.25 }, to: { x: 12.8, y: 9.25 } },    // net naast de voetgangers (9.1), achter paal en paaltjes langs
+  };
+  // waar de wielen de grond raken in het ongespiegelde beeld (voor kijkt naar links, achter naar rechts)
+  const BIKE_WHEELS = { voor: [[8, 63], [38, 56]], achter: [[7, 62], [37, 51]] };
+  const BIKE_SPEED = 3.0, BIKE_PEDAL = 1.1;   // tegels per seconde (voetganger ± 1,2); trapstand wisselt per 1,1 tegel
+  FX.bike = null; FX.nextBike = 20 + Math.random() * 25;
+  const bikeReady = images => images && ['voor_1', 'voor_2', 'achter_1', 'achter_2'].every(k => { const im = images['fiets_' + k]; return im && im.complete && im.naturalWidth; });
+  const laneBusy = lane => FX.passers.some(p => p.lane === lane) || (lane === 'R' && FX.joke);
+  function bikeStep(dt, images, s) {
+    if (!FX.bike) {
+      FX.nextBike -= dt;
+      if (FX.nextBike > 0 || !bikeReady(images)) return;
+      const terras = s && CC.SIM.activeFurniture(s).some(f => f.id === 'decor_terras');
+      const free = ['R', 'L'].filter(l => !laneBusy(l) && !(l === 'L' && terras));
+      if (!free.length) { FX.nextBike = 2; return; }
+      const lane = pick(free), dir = Math.random() < 0.5 ? 1 : -1, L = BIKE_LANES[lane];
+      const A = dir > 0 ? L.from : L.to, B = dir > 0 ? L.to : L.from, len = Math.hypot(B.x - A.x, B.y - A.y);
+      FX.bike = { lane, A, B, len, d: 0, x: A.x, y: A.y, ...faceFor(lane, dir), bubble: null,
+        bell: Math.random() < 0.4 ? len * rnd(0.35, 0.55) : -1 };   // soms een belletje, ongeveer halverwege
+      return;
+    }
+    const b = FX.bike;
+    b.d += BIKE_SPEED * dt;
+    if (b.d >= b.len) { FX.bike = null; FX.nextBike = rnd(30, 60); return; }
+    const k = b.d / b.len; b.x = b.A.x + (b.B.x - b.A.x) * k; b.y = b.A.y + (b.B.y - b.A.y) * k;
+    if (b.bell >= 0 && b.d >= b.bell) { b.bell = -1; b.bubble = { text: T().bell, tone: 'grey', t: 1.6 }; }
+    if (b.bubble) { b.bubble.t -= dt; if (b.bubble.t <= 0) b.bubble = null; }
+  }
+  // Tekent de fietser; geeft [x, y] van de bovenkant terug (voor het ballonnetje), of null.
+  FX.drawBike = function (ctx, b, images) {
+    const view = b.toward ? 'voor' : 'achter', img = images['fiets_' + view + '_' + (1 + Math.floor(b.d / BIKE_PEDAL) % 2)];
+    if (!img || !img.complete || !img.naturalWidth) return null;
+    const w = img.naturalWidth, h = img.naturalHeight, flip = b.face !== (b.toward ? -1 : 1);
+    const wh = BIKE_WHEELS[view].map(([x, y]) => [flip ? w - 1 - x : x, y]);
+    const [sx, sy] = R().iso(b.x, b.y);
+    const x = Math.round(sx - (wh[0][0] + wh[1][0]) / 2), y = Math.round(sy - (wh[0][1] + wh[1][1]) / 2);
+    // schaduw: een smalle strook van wiel tot wiel, elke pixel één keer
+    ctx.fillStyle = 'rgba(31,10,14,0.3)';
+    const [[ax, ay], [bx, by]] = wh, n = Math.max(Math.abs(bx - ax), Math.abs(by - ay)), seen = new Set();
+    for (let i = 0; i <= n; i++) {
+      const px = Math.round(ax + (bx - ax) * i / n), py = Math.round(ay + (by - ay) * i / n);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -2; dx <= 2; dx++) {
+        if (Math.abs(dy) === 1 && Math.abs(dx) === 2) continue;
+        const key = (px + dx) + ',' + (py + dy); if (seen.has(key)) continue; seen.add(key);
+        ctx.fillRect(x + px + dx, y + py + dy + 1, 1, 1);
+      }
+    }
+    if (flip) { ctx.save(); ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0); ctx.restore(); }
+    else ctx.drawImage(img, x, y);
+    return [x + Math.round(w / 2), y + 2];
+  };
+
   // Alles buiten: geeft tekenbare dingen terug ({c} voor mensen, {critter} voor dieren).
-  FX.street = function (dt, phase) {
+  FX.street = function (dt, phase, images, s) {
     const open = phase === 'sale', closed = phase === 'prep';
-    if (!open && !closed) { FX.passers = []; FX.critter = null; FX.joke = null; return []; }
+    if (!open && !closed) { FX.passers = []; FX.critter = null; FX.joke = null; FX.bike = null; return []; }
     // voorbijgangers
     FX.nextPasser -= dt;
     if (FX.nextPasser <= 0 && FX.passers.length < 3) {
       FX.nextPasser = open ? rnd(4, 9) : rnd(8, 15);
-      const lane = Math.random() < 0.55 ? 'R' : 'L', dir = Math.random() < 0.5 ? 1 : -1;
+      let lane = Math.random() < 0.55 ? 'R' : 'L'; const dir = Math.random() < 0.5 ? 1 : -1;
+      if (FX.bike && FX.bike.lane === lane) lane = lane === 'R' ? 'L' : 'R';   // niet op de stoep waar de fietser rijdt
       const p = newPerson(lane, dir); passerPlan(p, closed); FX.passers.push(p);
     }
     FX.passers = FX.passers.filter(p => runPerson(p, dt));
     const out = FX.passers.map(p => ({ depth: p.x + p.y, c: p }));
+    // fietser: aan de straatkant, dus vóór alles in de winkel
+    bikeStep(dt, images, s);
+    if (FX.bike) out.push({ depth: 1000, bike: FX.bike });
     // grapjes als de winkel dicht is: om de beurt kat-en-muis, te laat, dutje
     if (closed) {
-      if (!FX.joke) {
+      if (!FX.joke && !(FX.bike && FX.bike.lane === 'R')) {   // de grapjes spelen op de rechterstoep
         FX.nextCritter -= dt;
         if (FX.nextCritter <= 0) {
           if (!FX.jokeOrder.length) FX.jokeOrder = ['catmouse', 'late', 'nap'].sort(() => Math.random() - 0.5);
