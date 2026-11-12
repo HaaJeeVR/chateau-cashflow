@@ -49,6 +49,7 @@ Chateau Cashflow/
 │  ├─ build_bg.py      ← achtergrond + lagen uit art_bronnen/ (ook vitrine en winkelfases)
 │  ├─ measure_planks.py ← plankposities in de kasten meten
 │  ├─ import_bladen.py ← figuren uit bladen van 2 × 3 (art_bronnen/personages/bladen_2026-11-12): staand + walk2/walk3, voor en achter, + sprites.js
+│  ├─ import_fietser.py ← fietser uit een blad van 2 × 2 (art_bronnen/personages/fietser.png) → assets/fietser_*.png + fietser.js (wielen)
 │  ├─ build_sprites.py ← alleen nog --manifest (sprites.js uit assets/chr_*); oude route <type>_<voor|achter>.png
 │  ├─ build_tiles.py   ← tegels + iconen voor kast, koeling, vitrine, uithangbord uit art_bronnen/tegels/tegels_bron.png; schrijft alleen als de pixels veranderen
 │  ├─ build_figuurtegels.py ← tegels met figuren (niveauscherm, personeelsvenster) uit de staande sprites; draait mee met build_tiles.py

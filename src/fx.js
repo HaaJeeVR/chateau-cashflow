@@ -242,7 +242,8 @@
     L: { from: { x: -4.4, y: 9.25 }, to: { x: 12.8, y: 9.25 } },    // net naast de voetgangers (9.1), achter paal en paaltjes langs
   };
   // waar de wielen de grond raken in het ongespiegelde beeld (voor kijkt naar links, achter naar rechts)
-  const BIKE_WHEELS = { voor: [[8, 63], [38, 56]], achter: [[7, 62], [37, 51]] };
+  // komt uit assets/fietser.js (tools/import_fietser.py schrijft het; met de hand bij te stellen); anders deze waarden
+  const BIKE_WHEELS = (CC.FIETSER && CC.FIETSER.wheels) || { voor: [[8, 63], [38, 56]], achter: [[7, 62], [37, 51]] };
   const BIKE_SPEED = 3.0, BIKE_PEDAL = 1.1;   // tegels per seconde (voetganger ± 1,2); trapstand wisselt per 1,1 tegel
   FX.bike = null; FX.nextBike = 20 + Math.random() * 25;
   const bikeReady = images => images && ['voor_1', 'voor_2', 'achter_1', 'achter_2'].every(k => { const im = images['fiets_' + k]; return im && im.complete && im.naturalWidth; });

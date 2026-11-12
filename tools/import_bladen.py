@@ -17,7 +17,7 @@ def runs(v, mingap):
         p = i
     out.append((a, p + 1)); return out
 
-def cells(mask):
+def cells(mask, ncol=3):   # ncol: 3 voor figuren, 2 voor de fietser (import_fietser.py)
     H, W = mask.shape
     rows = runs(mask.sum(1) > 2, 40)
     rows = sorted(rows, key=lambda r: r[0] - r[1])[:2]; rows.sort()
@@ -25,8 +25,8 @@ def cells(mask):
     for (y0, y1) in rows:
         sub = mask[y0:y1]
         cols = runs(sub.sum(0) > 1, 28)
-        cols = sorted(cols, key=lambda r: r[0] - r[1])[:3]; cols.sort()
-        if len(cols) != 3: cols = [(i * W // 3, (i + 1) * W // 3) for i in range(3)]
+        cols = sorted(cols, key=lambda r: r[0] - r[1])[:ncol]; cols.sort()
+        if len(cols) != ncol: cols = [(i * W // ncol, (i + 1) * W // ncol) for i in range(ncol)]
         row = []
         for (x0, x1) in cols:
             m = sub[:, x0:x1]; ys = np.where(m.any(1))[0]; xs = np.where(m.any(0))[0]
