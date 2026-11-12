@@ -322,9 +322,9 @@ function run(botName, seed) {
     else if (s.mishap && !s.mishap.choice) S.decideMishap(s, 'b', CC.makeRng(s));
     for (s.day = 0; s.day < C.daysPerWeek; s.day++) {
       S.refill(s);
-      const ord = S.settleOrder(s);   // bruiloft: zoals in het spel, vóór het bestellen
-      if (ord) { STAT.orders++; if (ord.ok) STAT.ordersOk++; }
       botDay(s, bot, lastSold, est(s));
+      const ord = S.settleOrder(s);   // bruiloft: zoals in het spel, als de winkel opengaat (na het bestellen, A3)
+      if (ord) { STAT.orders++; if (ord.ok) STAT.ordersOk++; }
       if (s.week === 1) w1min = Math.min(w1min, s.cash);
       const d = DAY.start(s);
       if (bot.advice) d.autoAdvice = adviceBot(bot.advice);   // advice 0/leeg = negeren (Dubois neemt het over als hij er is)

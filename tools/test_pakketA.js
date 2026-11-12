@@ -45,6 +45,7 @@ const server = http.createServer((req, res) => {
   await closeNotices();
   await ev(() => { app.order = {}; });
   check('telefoon opent het bestelvenster', (await click('w_phone')) && (await ev(() => app.panel)) === 'assort');
+  await wait(500);   // venster schuift in beeld
   const cap = await ev(() => ({ gev: CC.SIM.scarceLeft(app.s, 'wine_gevrey'), cha: CC.SIM.scarceLeft(app.s, 'wine_champagne') }));
   check('Gevrey 4 en Champagne 8 per week', cap.gev === 4 && cap.cha === 8, JSON.stringify(cap));
   const gp = await hit('op_wine_gevrey'), gq = await hit('oq_wine_gevrey');
@@ -84,6 +85,37 @@ const server = http.createServer((req, res) => {
   });
   check('failliet, eerste regel = te duur', pmA2 && pmA2[0] === 'tooExpensive', String(pmA2));
   await wait(3500); await shot('A2-failliet-prijs');
+
+  // ---------- A3: bruiloft telt als de winkel opengaat ----------
+  console.log('A3: bruiloft telt bij opening, met herinnering op donderdag');
+  await ev(() => {
+    app.newGame(); const s = app.s; s.flags.introSeen = true; s.level = 2; s.rep = 40; s.cash = 1500; s.mishap = null;
+    app.rebuildRoom();
+    CC.SIM.buy(s, 'wine_merlot', 24); CC.SIM.assignVak(s, 'vak_1', 'wine_merlot');
+    CC.SIM.buy(s, 'wine_cremant', 10); CC.SIM.assignVak(s, 'vak_2', 'wine_cremant');
+    s.card = { id: 'bruiloft', week: s.week }; s.day = 3; app.startPrep();
+  });
+  await closeNotices();
+  await ev(() => { app.openShop(); app.skipDay(); });
+  const rem = await ev(() => { const po = CC.SIM.pendingOrder(app.s); return po && app.summary.day === po.day - 1 && po.have < po.need; });
+  check('donderdag: herinnering in het dagrapport', rem);
+  await ev(() => { app.resultT = 3; }); await wait(300); await shot('A3-donderdag-herinnering');
+  await ev(() => { app.resultT = 9; app.afterResult(); while (app.phase === 'levelup' || app.phase === 'staffup') { if (app.phase === 'levelup') app.afterLevel(); else app.afterStaffUp(); } });
+  await closeNotices();
+  // vrijdagochtend: 18 in huis, 6 erbij bestellen
+  await ev(() => { const s = app.s; s.mishap = null; const n = CC.SIM.totalBottles(s, 'wine_cremant'); s.stock.wine_cremant = (s.stock.wine_cremant || 0) + (18 - n); app.order = {}; });
+  check('vrijdag, nog niet afgehandeld bij het begin van de ochtend', (await ev(() => app.s.day === 4 && !app.s.card.orderDone && !app.notice)));
+  await click('w_phone'); await wait(500); await click('op_wine_cremant');
+  await click('place_order'); await click('close');
+  check('18 in huis + 6 besteld = 24', (await ev(() => CC.SIM.totalBottles(app.s, 'wine_cremant'))) === 24);
+  const cash0 = await ev(() => app.s.cash);
+  await click('open');
+  const nt = await ev(() => ({ n: app.notice && app.notice.good, done: app.s.card.orderDone, phase: app.phase }));
+  check('bij openen: bruiloft gelukt', nt.n === true && nt.done && nt.phase === 'prep', JSON.stringify(nt));
+  check('geld van het bruidspaar binnen', (await ev(() => app.s.cash)) > cash0);
+  await shot('A3-bruiloft-gelukt');
+  await click('notice_ok');
+  check('melding weg: de winkel gaat meteen open', (await ev(() => app.phase)) === 'sale');
 
   check('geen fouten in de console', errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close(); server.close();

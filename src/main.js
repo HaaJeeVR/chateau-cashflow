@@ -296,12 +296,6 @@
     const seen = app.s.flags.scarceSeen || [];
     const sc = SIM.unlockedWines(app.s).find(w => CC.roleById(w.role).scarce && !seen.includes(w.id));
     app.notice = sc ? { wine: sc.id } : null;
-    // opdracht van een weekkaart (bruiloft) die vanochtend afloopt
-    const ord = SIM.settleOrder(app.s);
-    if (ord) {
-      const T = CC.TEXT.orderNotice, txt = (ord.ok ? T.ok : T.fail).split('{paid}').join(R.euro(ord.paid || 0)).split('{rep}').join(ord.ok ? ord.rep : ord.rep).split('{have}').join(ord.have);
-      app.notice = { title: T.title, text: txt, good: ord.ok, next: app.notice };
-    }
     // klik op het avondinzicht van gisteren: nu het venster op die wijn openen
     // allereerste ochtend: de bankier legt het doel uit (M7, besluit 78)
     if (!app.s.flags.introSeen && app.s.week === 1 && app.s.day === 0) {
@@ -389,7 +383,7 @@
   app.setPrice = function (id, st) { SIM.setPrice(app.s, id, st); app.s.flags.priced = true; app.save(); };
   app.closeNotice = function () {
     if (!app.notice) return;
-    if (!app.notice.wine) { if (app.notice.flag) app.s.flags[app.notice.flag] = true; app.notice = app.notice.next || null; app.save(); return; }
+    if (!app.notice.wine) { const open = app.notice.thenOpen; if (app.notice.flag) app.s.flags[app.notice.flag] = true; app.notice = app.notice.next || null; app.save(); if (open && !app.notice) app.openShop(); return; }
     app.s.flags.scarceSeen = (app.s.flags.scarceSeen || []).concat([app.notice.wine]);
     app.notice = null; app.save();
     const seen = app.s.flags.scarceSeen, sc = SIM.unlockedWines(app.s).find(w => CC.roleById(w.role).scarce && !seen.includes(w.id));
@@ -402,6 +396,14 @@
     app.emptyWarn = false;
     app.delivery = null;
     if (app.s.mishap && !app.s.mishap.choice) return;   // eerst de tegenvaller afhandelen
+    // opdracht van een weekkaart (bruiloft): tellen op het moment dat de winkel opengaat, dus na de ochtendbestelling (A3).
+    // Eerst de melding; wegklikken opent de winkel meteen.
+    const ord = SIM.settleOrder(app.s);
+    if (ord) {
+      const T = CC.TEXT.orderNotice, txt = (ord.ok ? T.ok : T.fail).split('{paid}').join(R.euro(ord.paid || 0)).split('{rep}').join(ord.rep).split('{have}').join(ord.have);
+      app.notice = { title: T.title, text: txt, good: ord.ok, thenOpen: true };
+      app.save(); return;
+    }
     app.panel = null; app.phase = 'sale'; app.speed = app.speed || 1; app.acc = 0;
     app.s.flags.opened = true;
     app.day = DAY.start(app.s);

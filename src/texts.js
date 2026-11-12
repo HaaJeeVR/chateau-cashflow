@@ -164,6 +164,7 @@
       title: 'Vrijdag: de bruiloft',
       ok: 'Het bruidspaar haalt 24 flessen op. {paid} in de kassa (met fooi) en reputatie +{rep}. De bruid huilde een beetje.',
       fail: 'Je had maar {have} flessen mousserend in huis. Het bruidspaar is naar de supermarkt gegaan. Reputatie {rep}.',
+      remind: 'Morgen bij opening haalt het bruidspaar {need} flessen mousserend op. Nu in huis: {have}. Bestel morgenochtend bij.',
     },
     assort: {
       proposal: 'Ik heb aangevuld tot je lijst van gisteren. Kijk even, en zeg het maar.',

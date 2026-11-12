@@ -562,7 +562,15 @@
   SIM.typeMul = function (s, k) { let m = 1; for (const e of SIM.effects(s)) if (e.types && e.types[k]) m *= e.types[k]; return m; };
   SIM.repMul = function (s) { let m = 1; for (const e of SIM.effects(s)) m *= e.rep || 1; return m; };
 
-  // Opdracht (kaart "bruiloft"): op de afgesproken ochtend n flessen die passen uit voorraad halen.
+  // Lopende opdracht van deze week (bruiloft): { day, need, have } of null. Voor de herinnering op de dag ervoor (A3).
+  SIM.pendingOrder = function (s) {
+    if (!s.card || s.card.week !== s.week || s.card.orderDone) return null;
+    const c = CC.cardById(s.card.id); if (!c || !c.order) return null;
+    const ws = CC.WINES.filter(w => SIM.cardMatch(c.order.match, w));
+    return { day: c.order.day, need: c.order.n, have: ws.reduce((a, w) => a + SIM.totalBottles(s, w.id), 0) };
+  };
+  // Opdracht (kaart "bruiloft"): op de afgesproken dag n flessen die passen uit voorraad halen.
+  // A3: het spel telt pas als de winkel opengaat (na de ochtendbestelling), niet bij het begin van de ochtend.
   // Geeft null als er vandaag niets af te handelen is, anders { ok, n, paid, rep }.
   SIM.settleOrder = function (s) {
     if (!s.card || s.card.week !== s.week || s.card.orderDone) return null;

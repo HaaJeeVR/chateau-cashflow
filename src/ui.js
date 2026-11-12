@@ -568,9 +568,17 @@
         }
       }
     }
-    // onderaan rechts: nieuw niveau of een droge opmerking
-    const foot = sm.levelUp ? `★ NIEUW NIVEAU: ${sm.levelUp.to} ★` : (due <= 0 ? app.resultQuip : '');
-    if (foot && k >= 1 && ry < y + H - 34) F().wrap(foot, rw).slice(0, 2).forEach((l, i) => F().draw(ctx, l, rx + rw / 2, y + H - 30 + i * 10, sm.levelUp ? P.bord2 : P.stone1, { align: 'center' }));
+    // onderaan rechts: herinnering voor de bruiloft (A3), anders nieuw niveau of een droge opmerking
+    const po = CC.SIM.pendingOrder(s);
+    if (po && sm.week === s.week && sm.day === po.day - 1 && po.have < po.need && k >= 1) {
+      const rl = F().wrap(fill(CC.TEXT.orderNotice.remind, { need: po.need, have: po.have }), rw - 12).slice(0, 3);
+      const bh = rl.length * 10 + 6, by = Math.max(ry, y + H - 12 - bh);
+      R().round(ctx, rx, by - 2, rw, bh, 4, 'rgba(232,181,58,0.30)');
+      rl.forEach((l, i) => F().draw(ctx, l, rx + 6, by + 1 + i * 10, P.bord2));
+    } else {
+      const foot = sm.levelUp ? `★ NIEUW NIVEAU: ${sm.levelUp.to} ★` : (due <= 0 ? app.resultQuip : '');
+      if (foot && k >= 1 && ry < y + H - 34) F().wrap(foot, rw).slice(0, 2).forEach((l, i) => F().draw(ctx, l, rx + rw / 2, y + H - 30 + i * 10, sm.levelUp ? P.bord2 : P.stone1, { align: 'center' }));
+    }
     const last = s.day === CC.CONFIG.daysPerWeek - 1;
     if (t > 0.3) UI.btn(app, ctx, 'next', X + W / 2 - 80, y + H + 6, 160, 20, k < 1 ? 'Verder ▶' : (sm.levelUp ? 'Verder ▶' : (last ? 'Naar zondag ▶' : 'Volgende dag ▶')), () => app.afterResult(), { tone: 'bord' });
   };
