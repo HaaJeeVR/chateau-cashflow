@@ -757,6 +757,7 @@
       if (app.phase === 'gameover') UI.endPanel(app, ctx, false);
       if (app.phase === 'won') UI.endPanel(app, ctx, true);
     }
+    if (app.phase !== 'title') UI.confirmNewPanel(app, ctx);   // A8: Opnieuw beginnen (zondag na uitstel)
     if (CC.FX) CC.FX.drawParts(ctx, dt);   // deeltjes boven alles (muntjes, deurbel, vuurwerk)
     if (app.dialog) UI.textDialog(app, ctx);
     DBG.draw(app, ctx);

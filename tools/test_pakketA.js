@@ -194,6 +194,22 @@ const server = http.createServer((req, res) => {
   await ev(() => { while (app.notice) app.closeNotice(); app.setPhase('title'); app.hasSave = CC.hasSave(); });
   await wait(300); await shot('A7-titel-beste');
 
+  // ---------- A8: opnieuw beginnen na uitstel ----------
+  console.log('A8: "Opnieuw beginnen" op de zondag na uitstel, met bevestiging');
+  await ev(() => { app.newGame(); const s = app.s; s.flags.introSeen = true; s.week = 3; s.day = 6; s.cash = 10; s.level = 2; s.mishap = null; app.rebuildRoom(); app.openSunday(); app.ring = null; });
+  check('voor uitstel: geen knop', !(await hit('restart_ask')));
+  await click('postpone'); await wait(1600);
+  check('na uitstel: knop staat er', !!(await hit('restart_ask')));
+  await shot('A8-zondag-na-uitstel');
+  await click('restart_ask');
+  check('eerst bevestigen', (await ev(() => app.confirmNew)) === true && (await ev(() => app.s.week)) === 3);
+  await shot('A8-bevestigen');
+  await click('confirm_no');
+  check('Terug: niets veranderd', (await ev(() => !app.confirmNew && app.s.week === 3 && app.phase === 'sunday')));
+  await click('restart_ask'); await click('confirm_yes');
+  check('Ja: nieuw spel in week 1, oude als reservekopie', (await ev(() => app.s.week === 1 && app.phase === 'prep' && CC.hasBackup() && CC.backupInfo().week === 3)));
+  await ev(() => { while (app.notice) app.closeNotice(); });
+
   check('geen fouten in de console', errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close(); server.close();
   console.log(fails ? `\n${fails} FOUT(EN)` : '\nAlles groen.');

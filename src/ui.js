@@ -914,7 +914,12 @@
       }
     } else {
       UI.btn(app, ctx, 'newweek', bx, byy, 130, 20, `Week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
+      if (s.postponed && s.status === 'playing') UI.restartBtn(app, ctx, bx + 136, byy, 112, 20);   // A8: na uitstel
     }
+  };
+  // A8: "Opnieuw beginnen" na uitstel; vraagt eerst bevestiging (hetzelfde venster als Nieuw spel, met reservekopie)
+  UI.restartBtn = function (app, ctx, x, y, w, h) {
+    UI.btn(app, ctx, 'restart_ask', x, y, w, h, 'Opnieuw beginnen', () => { app.confirmOld = app.s; app.confirmNew = true; }, { tone: 'wood', tip: 'Deze run stoppen en een nieuw spel beginnen. Je huidige spel blijft bewaard als reservekopie.' });
   };
 
   // ---------- Personeel (01_ONTWERP §9) ----------
@@ -1455,6 +1460,7 @@
     if (!sun.chosen && t > 1.2 && !app.canAffordCard()) {   // geen van beide te betalen: dan zonder kaart verder
       UI.btn(app, ctx, 'newweek', 320 - 80, y0 + CH + 12, 160, 20, `Zonder kaart naar week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
     }
+    if (s.postponed && s.status === 'playing' && t > 1.2) UI.restartBtn(app, ctx, 640 - 124, 334, 116, 18);   // A8: rechtsonder, uit de weg
     if (sun.chosen && ct > 1.1) {
       const T = CC.TEXT.cards[sun.chosen];
       HF().draw(ctx, T.title, 320, 152, P.gold2, { align: 'center', shadow: P.ink });
@@ -1871,7 +1877,7 @@
     UI.hit(app, 'confirm_block', 0, 0, 640, 360, () => {}, null);
     const w = 280, h = 112, x = 180, y = 118;
     R().panel(ctx, x, y, w, h);
-    HF().draw(ctx, 'Nieuw spel beginnen?', x + w / 2, y + 16, P.bord2, { align: 'center' });
+    HF().draw(ctx, app.phase === 'title' ? 'Nieuw spel beginnen?' : 'Opnieuw beginnen?', x + w / 2, y + 16, P.bord2, { align: 'center' });
     const lines = F().wrap(`Je spel in week ${o.week || 1} (niveau ${o.level || 1}, kas ${R().euro(o.cash || 0)}) wordt vervangen. Het blijft bewaard als reservekopie; die kun je hier later terugzetten.`, w - 40);
     lines.forEach((l, i) => F().draw(ctx, l, x + w / 2, y + 40 + i * 10, P.ink, { align: 'center' }));
     UI.btn(app, ctx, 'confirm_no', x + 24, y + h - 32, 104, 20, 'Terug', () => { app.confirmNew = false; }, { tone: 'wood' });
