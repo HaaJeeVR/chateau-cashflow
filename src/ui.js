@@ -1951,8 +1951,10 @@
       smallBtn(app, ctx, 'om_' + id, bx, ry, 20, '−6', () => set(n - 6), { disabled: n <= 0 || blocked });
       R().round(ctx, bx + 22, ry, 32, 13, 4, n ? P.gold : P.cream1);
       F().draw(ctx, String(n), bx + 38, ry + 3, n ? P.ink : P.stone2, { align: 'center' });
-      smallBtn(app, ctx, 'op_' + id, bx + 56, ry, 20, '+6', () => set(n + 6), { disabled: n + 6 > cap || blocked, tone: 'green' });
-      smallBtn(app, ctx, 'oq_' + id, bx + 78, ry, 24, '+12', () => set(n + 12), { disabled: n + 12 > cap || blocked, tone: 'green' });
+      // A1: plusknoppen blijven aan zolang er nog een fles te bestellen is en vullen aan tot het maximum
+      // (schaars: Gevrey 4, Champagne 8 per week); −6 gaat naar 0 als er minder dan 6 staan (set klemt).
+      smallBtn(app, ctx, 'op_' + id, bx + 56, ry, 20, '+6', () => set(n + 6), { disabled: n >= cap || blocked, tone: 'green' });
+      smallBtn(app, ctx, 'oq_' + id, bx + 78, ry, 24, '+12', () => set(n + 12), { disabled: n >= cap || blocked, tone: 'green' });
       F().draw(ctx, n ? R().euro(n * SIM.buyPrice(s, w)) : '-', x + 348, ry + 3, n ? P.ink : P.stone2, { align: 'right' });
       // schap
       const sx = x + 354, sw = 78;
