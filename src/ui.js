@@ -22,6 +22,25 @@
     return null;
   };
 
+  // A9: op een touchscreen is elk klikvlak minstens min × min spelpixels (40 CSS-px), gecentreerd op de knop.
+  // Waar vergrote vlakken elkaar raken, wint de knop die het dichtst bij de vinger ligt; de tekening blijft gelijk.
+  // Grote vlakken (vensters, verduistering, kaarten) blokkeren wat eronder ligt, zoals bij de muis.
+  const BIG = 6000;   // spelpixels²: daarboven telt een vlak als achtergrond
+  UI.pickTouch = function (x, y, min) {
+    let B = -1;
+    for (let i = UI.hits.length - 1; i >= 0; i--) { const h = UI.hits[i]; if (h.w * h.h >= BIG && x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h) { B = i; break; } }
+    let best = null, bestD = Infinity;
+    for (let i = UI.hits.length - 1; i > B; i--) {
+      const h = UI.hits[i]; if (h.w * h.h >= BIG || (!h.onClick && !h.tip)) continue;
+      if (x >= h.x && x < h.x + h.w && y >= h.y && y < h.y + h.h) return h;   // precies erop: de bovenste
+      const ew = Math.max(h.w, min), eh = Math.max(h.h, min), ex = h.x + h.w / 2 - ew / 2, ey = h.y + h.h / 2 - eh / 2;
+      if (x < ex || x >= ex + ew || y < ey || y >= ey + eh) continue;
+      const dx = Math.max(h.x - x, 0, x - (h.x + h.w)), dy = Math.max(h.y - y, 0, y - (h.y + h.h)), d = dx * dx + dy * dy;
+      if (d < bestD) { best = h; bestD = d; }
+    }
+    return best || (B >= 0 ? UI.hits[B] : null);
+  };
+
   UI.btn = function (app, ctx, id, x, y, w, h, label, onClick, opts) {
     opts = opts || {};
     const hover = UI.hit(app, id, x, y, w, h, opts.disabled ? null : onClick, opts.tip);
@@ -213,7 +232,7 @@
   };
 
   UI.tooltip = function (app, ctx) {
-    const h = UI.pick(app.mouse.x, app.mouse.y);
+    const h = app.touchInput ? UI.pickTouch(app.mouse.x, app.mouse.y, app.touchMin()) : UI.pick(app.mouse.x, app.mouse.y);
     if (!h || !h.tip) return;
     // lange tips breken af; het vakje blijft altijd helemaal in beeld
     const lines = F().wrap(h.tip, 240);

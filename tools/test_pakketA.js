@@ -210,6 +210,57 @@ const server = http.createServer((req, res) => {
   check('Ja: nieuw spel in week 1, oude als reservekopie', (await ev(() => app.s.week === 1 && app.phase === 'prep' && CC.hasBackup() && CC.backupInfo().week === 3)));
   await ev(() => { while (app.notice) app.closeNotice(); });
 
+  // ---------- A9: telefoon liggend en staand, delen ----------
+  console.log('A9: touch op 844 x 390, staand scherm, favicon en deelvoorbeeld');
+  {
+    const tp = await browser.newPage({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+    tp.on('pageerror', e => errors.push(String(e)));
+    const tev = (fn, a) => tp.evaluate(fn, a);
+    const tframes = () => tev(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await tp.goto(url); await tev(() => { localStorage.clear(); CC.setSetting('introSeen', true); }); await tp.reload(); await tp.waitForTimeout(500);
+    const box = await tp.locator('#game').boundingBox(), k = box.width / 640;
+    const tap = async (gx, gy) => { await tp.touchscreen.tap(box.x + gx * k, box.y + gy * k); await tframes(); await tframes(); };
+    const thit = async id => { await tframes(); return tev(id => { const h = CC.UI.hits.find(h => h.id === id); return h && { x: h.x, y: h.y, w: h.w, h: h.h }; }, id); };
+    await tev(() => { app.newGame(); const s = app.s; s.flags.introSeen = true; s.level = 8; s.rep = 900; s.cash = 3000; s.mishap = null; app.rebuildRoom(); app.startPrep(); while (app.notice) app.closeNotice(); app.order = {}; app.openPanel('phone'); });
+    await tp.waitForTimeout(400);
+    const min = await tev(() => app.touchMin());
+    check('40 CSS-px = ' + min + ' spelpixels', min >= 36 && min <= 38, String(min));
+    const p12 = await thit('oq_wine_merlot');
+    await tap(p12.x + p12.w + 7, p12.y + p12.h / 2);   // 7 spelpixels rechts naast +12, waar geen knop staat
+    check('tik naast +12 telt als +12 (Merlot)', (await tev(() => app.order.wine_merlot)) === 12, JSON.stringify(await tev(() => app.order)));
+    const p6 = await thit('op_wine_merlot');
+    await tap(p6.x + p6.w / 2, p6.y - 1);   // net boven +6 (in de naad met de rij erboven): de dichtstbijzijnde knop wint
+    check('tik in de naad tussen twee rijen: dichtstbijzijnde knop (+6 Merlot)', (await tev(() => app.order.wine_merlot)) === 18 && (await tev(() => Object.keys(app.order).length)) === 1, JSON.stringify(await tev(() => app.order)));
+    const cl = await thit('close');
+    await tap(cl.x + cl.w + 6, cl.y + cl.h / 2);   // naast het kruisje
+    check('tik naast het kruisje sluit het venster', (await tev(() => app.panel)) === null);
+    await tev(() => { CC.SIM.buy(app.s, 'wine_merlot', 12); CC.SIM.assignVak(app.s, 'vak_1', 'wine_merlot'); app.openPanel('prices'); }); await tp.waitForTimeout(400);
+    const pr = await thit('pr_wine_merlot_stevig');
+    const st0 = await tev(() => app.s.prices.wine_merlot);
+    await tap(pr.x + pr.w / 2, pr.y + pr.h / 2);
+    check('eerste tik op een prijsstand: alleen de tooltip', (await tev(() => app.s.prices.wine_merlot)) === st0 && (await tev(() => app.touchTip)) === 'pr_wine_merlot_stevig');
+    if (SHOTS) await tp.screenshot({ path: path.join(SHOTS, 'A9-tooltip-touch.png') });
+    await tap(pr.x + pr.w / 2, pr.y + pr.h / 2);
+    check('tweede tik voert uit', (await tev(() => app.s.prices.wine_merlot)) === 'stevig');
+    await tev(() => { app.openPanel('phone'); }); await tp.waitForTimeout(400);
+    if (SHOTS) await tp.screenshot({ path: path.join(SHOTS, 'A9-bestellen-844x390.png') });
+    // staand: melding, en de verkoopdag staat stil
+    await tev(() => { app.closePanel(); app.openShop(); });
+    await tp.setViewportSize({ width: 390, height: 844 }); await tp.waitForTimeout(300);
+    const pt = await tev(() => ({ p: app.portrait, cls: document.body.classList.contains('portrait'), t: app.day && app.day.t }));
+    await tp.waitForTimeout(500);
+    const t2 = await tev(() => app.day && app.day.t);
+    check('staand: melding "Draai je telefoon" en de dag staat stil', pt.p && pt.cls && t2 === pt.t, JSON.stringify(pt) + ' ' + t2);
+    if (SHOTS) await tp.screenshot({ path: path.join(SHOTS, 'A9-staand.png') });
+    await tp.setViewportSize({ width: 844, height: 390 }); await tp.waitForTimeout(300);
+    check('weer liggend: melding weg', (await tev(() => !app.portrait && !document.body.classList.contains('portrait'))));
+    const meta = await tev(() => ({ icon: !!document.querySelector('link[rel=icon]'), og: ['og:title', 'og:description', 'og:image'].every(p => document.querySelector(`meta[property="${p}"]`)), d: !!document.querySelector('meta[name=description]') }));
+    check('favicon, og:title/description/image en description in index.html', meta.icon && meta.og && meta.d, JSON.stringify(meta));
+    const fav = await tp.request.get(url + 'assets/favicon.png'), og = await tp.request.get(url + 'assets/og_image.jpg'), ico = await tp.request.get(url + 'favicon.ico');
+    check('favicon.png, favicon.ico en og_image.jpg bestaan', fav.ok() && og.ok() && ico.ok());
+    await tp.close();
+  }
+
   check('geen fouten in de console', errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close(); server.close();
   console.log(fails ? `\n${fails} FOUT(EN)` : '\nAlles groen.');

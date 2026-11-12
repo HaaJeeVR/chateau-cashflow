@@ -45,7 +45,7 @@
   // schuldenvrij-scherm in plaats van de winkel (besluit 101); ontbreekt het, dan blijft alles zoals het was.
   { const sv = new Image(); sv.onerror = () => { app.images.schuldenvrij = null; }; sv.src = 'assets/schuldenvrij.png'; app.images.schuldenvrij = sv; }
   CC.IMAGES = app.images;
-  const logoSign = new Image(); logoSign.onload = () => { R.roomCache = null; }; logoSign.src = 'assets/logo_sign.png'; app.images.logoSign = logoSign;
+  const logoSign = new Image(); logoSign.onload = () => { R.roomCache = null; if (app.portrait && typeof checkPortrait === 'function') checkPortrait(); }; logoSign.src = 'assets/logo_sign.png'; app.images.logoSign = logoSign;
 
   // ---------- Schaling (besluit 87, vervangt 12): venster vullen, 16:9 ----------
   // Doelmaat in apparaatpixels = zo groot mogelijk binnen het venster. De canvas krijgt de kleinste hele
@@ -68,7 +68,38 @@
     canvas.style.imageRendering = devW === R.W * k ? 'pixelated' : 'auto';
     app.scale = devW / dpr / R.W;                                   // CSS-px per spelpixel
   }
-  window.addEventListener('resize', fit); fit();
+  // A9: telefoon staand: het spel is liggend. Melding in een eigen canvas, met het pixelfont en de vensterstijl,
+  // op een hele schaal zodat het scherp blijft. De verkoopdag staat zolang stil.
+  const rot = document.getElementById('rotate');
+  const coarse = window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
+  function checkPortrait() {
+    const portrait = window.innerHeight > window.innerWidth && ((coarse && coarse.matches) || window.innerWidth < 600);
+    app.portrait = portrait;
+    document.body.classList.toggle('portrait', portrait);
+    if (!portrait || !rot) return;
+    const dpr = window.devicePixelRatio || 1, W = Math.round(window.innerWidth * dpr), H = Math.round(window.innerHeight * dpr);
+    const s = Math.max(1, Math.round(W / 210));                 // ± 200 spelpixels breed
+    const w = Math.ceil(W / s), h = Math.ceil(H / s);
+    rot.width = w * s; rot.height = h * s;
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+    R.rect(g, 0, 0, w, h, P.ink);
+    const pw = Math.min(w - 12, 184), ph = 132, px = Math.round((w - pw) / 2), py = Math.round((h - ph) / 2);
+    R.panel(g, px, py, pw, ph);
+    const sign = app.images.logoSign;   // het uithangbord van de winkel erboven
+    if (sign && sign.complete && sign.naturalWidth) g.drawImage(sign, Math.round(w / 2 - sign.naturalWidth / 2), py - sign.naturalHeight - 10);
+    // telefoontje dat kantelt: staand (grijs) en liggend (goud) met een boogpijl ertussen
+    const cx = Math.round(w / 2);
+    R.round(g, cx - 40, py + 16, 18, 30, 3, P.stone1); R.round(g, cx - 38, py + 18, 14, 24, 2, P.cream1); R.rect(g, cx - 33, py + 43, 4, 1, P.stone1);
+    R.round(g, cx + 10, py + 22, 30, 18, 3, P.wood2); R.round(g, cx + 12, py + 24, 24, 14, 2, P.gold); R.rect(g, cx + 37, py + 29, 1, 4, P.wood2);
+    for (let i = 0; i < 9; i++) R.rect(g, cx - 14 + i * 2, py + 18 + Math.round(Math.pow(i - 4, 2) / 4), 2, 2, P.bord2);
+    R.rect(g, cx + 2, py + 20, 2, 2, P.bord2); R.rect(g, cx + 1, py + 23, 3, 2, P.bord2); R.rect(g, cx - 1, py + 21, 3, 2, P.bord2);
+    CC.FONT.head.draw(g, 'Draai je telefoon', cx, py + 58, P.bord2, { align: 'center' });
+    CC.FONT.wrap('Château Cashflow speel je liggend. Kantel je telefoon, dan gaat het spel verder.', pw - 24).forEach((l, i) => CC.FONT.draw(g, l, cx, py + 80 + i * 10, P.ink, { align: 'center' }));
+    const o = rot.getContext('2d'); o.imageSmoothingEnabled = false; o.drawImage(c, 0, 0, w * s, h * s);
+  }
+  window.addEventListener('resize', () => { fit(); checkPortrait(); }); fit();
+  window.addEventListener('orientationchange', () => setTimeout(() => { fit(); checkPortrait(); }, 50));
+  setTimeout(checkPortrait, 0);
   if (window.matchMedia) {   // schaal 100% ↔ 125% of ander scherm: devicePixelRatio verandert zonder resize
     const watchDpr = () => { const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`); const h = () => { fit(); watchDpr(); }; mq.addEventListener ? mq.addEventListener('change', h, { once: true }) : mq.addListener(h); };
     watchDpr();
@@ -94,6 +125,10 @@
     const r = canvas.getBoundingClientRect();
     return { x: Math.floor((e.clientX - r.left) / r.width * R.W), y: Math.floor((e.clientY - r.top) / r.height * R.H) };
   }
+  // A9: tik of muis? pointerdown komt vóór de nagebootste mousedown van een tik
+  app.touchInput = false;
+  canvas.addEventListener('pointerdown', e => { app.touchInput = e.pointerType === 'touch' || e.pointerType === 'pen'; app.mouse = toGame(e); }, true);
+  app.touchMin = () => Math.ceil(40 / (app.scale || 1));   // 40 CSS-px in spelpixels
   canvas.addEventListener('mousemove', e => { app.mouse = toGame(e); });
   canvas.addEventListener('mouseleave', () => { app.mouse = { x: -1, y: -1 }; });
   canvas.addEventListener('mousedown', e => {
@@ -101,9 +136,9 @@
     app.actT = app.t;   // de speler handelt: hints linksonder verdwijnen (besluit 89)
     const p = toGame(e);
     // fullscreen moet binnen de klik zelf (gebruikersgebaar), niet pas in de volgende frame
-    const h = app.phase !== 'intro' && UI.pick(p.x, p.y);
+    const h = app.phase !== 'intro' && (app.touchInput ? UI.pickTouch(p.x, p.y, app.touchMin()) : UI.pick(p.x, p.y));
     if (h && h.id === 'fullscreen') { app.toggleFullscreen(); return; }
-    app.click = p;
+    app.click = p; p.touch = app.touchInput;
   });
 
   // ---------- Intro (besluit 86): bij de eerste start, vóór het titelscherm ----------
@@ -694,6 +729,7 @@
   }
   const F = CC.FONT;
   let lastPhase = null;
+  const TOUCH_TIP = /^(pr_|klus_|bh_|bb_|fc_|tut_)/;   // A9: elementen waar de tooltip nieuwe informatie geeft
 
   function frame(dt) {
     app.t += dt;
@@ -706,15 +742,19 @@
     }
     // klik verwerken met de klikvlakken van de vorige frame
     if (app.click) {
-      const h = UI.pick(app.click.x, app.click.y);
-      if (h && h.onClick) h.onClick();
+      const c = app.click, h = c.touch ? UI.pickTouch(c.x, c.y, app.touchMin()) : UI.pick(c.x, c.y);
+      // A9: op touch toont de eerste tik op een prijsstand, klus of klanttype eerst de tooltip; de tweede tik voert uit
+      const tipFirst = c.touch && h && h.onClick && h.tip && TOUCH_TIP.test(h.id) && app.touchTip !== h.id;
+      app.touchTip = c.touch && h && h.tip ? h.id : null;
+      if (tipFirst) { /* alleen de tooltip: die staat onder de vinger (app.mouse) */ }
+      else if (h && h.onClick) h.onClick();
       else if (!h && app.panel && app.phase === 'prep') app.closePanel();
       app.click = null;
       if (app.phase === 'intro') { lastPhase = null; return; }   // "Intro" in het menu: vanaf de volgende frame speelt de intro
     }
     // simulatie
     if (app.advice) app.advice.t += dt;
-    if (app.phase === 'sale' && (app.advice || app.dialog)) { /* pauze: adviesvraag of feedback/codevenster open */ }
+    if (app.phase === 'sale' && (app.advice || app.dialog || app.portrait)) { /* pauze: adviesvraag, feedback/codevenster open of telefoon staand */ }
     else if (app.phase === 'sale') {
       app.day.speed = app.speed;
       app.acc += Math.min(dt, 0.1) * app.speed;
@@ -761,7 +801,7 @@
     if (CC.FX) CC.FX.drawParts(ctx, dt);   // deeltjes boven alles (muntjes, deurbel, vuurwerk)
     if (app.dialog) UI.textDialog(app, ctx);
     DBG.draw(app, ctx);
-    const h = UI.pick(app.mouse.x, app.mouse.y);
+    const h = app.touchInput ? UI.pickTouch(app.mouse.x, app.mouse.y, app.touchMin()) : UI.pick(app.mouse.x, app.mouse.y);
     app.hoverId = h ? h.id : null;
     canvas.style.cursor = h && h.onClick ? 'pointer' : 'default';
     UI.tooltip(app, ctx);
