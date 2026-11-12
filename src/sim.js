@@ -846,7 +846,8 @@
   SIM.startWeek = function (s) {
     s.week++; s.day = 0; s.weekBought = {}; s.sun = null;
     SIM.rollMishap(s, CC.makeRng(s));
-    if (s.status === 'won') s.status = 'endless';
+    // A7: naar vrij spelen: de weekkaart van week 8 is voorbij en mag niet als oude kaart blijven hangen
+    if (s.status === 'won') { s.status = 'endless'; if (s.card && s.card.week < s.week) s.card = null; }
   };
 
   CC.SIM = SIM;

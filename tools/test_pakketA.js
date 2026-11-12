@@ -169,6 +169,31 @@ const server = http.createServer((req, res) => {
   await ev(() => { app.advice = null; app.skipDay(); });
   await frames(4);
 
+  // ---------- A7: na de winst ----------
+  console.log('A7: opnieuw spelen, beste score, weekkaart na week 8');
+  const winSetup = () => ev(() => {
+    app.newGame(); const s = app.s; s.flags.introSeen = true; s.level = 8; s.rep = 800; s.week = 8; s.day = 6; s.cash = 6000; s.debtPaid = 3280;
+    s.totals.bottles = 900; s.card = { id: 'hittegolf', week: 8 }; s.mishap = null; app.rebuildRoom(); app.openSunday(); app.ring = null;
+    app.bankPay();
+  });
+  await ev(() => CC.setSetting('bestScore', null));
+  await winSetup(); await wait(5500);
+  const best1 = await ev(() => ({ ph: app.phase, b: CC.getSetting('bestScore'), sc: CC.UI.finalScore(app.s).total }));
+  check('schuldenvrij, score bewaard als beste', best1.ph === 'won' && best1.b && best1.b.score === best1.sc, JSON.stringify(best1));
+  const rp = await hit('replay'), en = await hit('endless');
+  check('knoppen "Opnieuw spelen" en "Verder spelen" naast elkaar', rp && en && rp.on && en.on && Math.abs(rp.y - en.y) < 1 && rp.x + rp.w <= en.x);
+  await shot('A7-schuldenvrij-beste');
+  await click('endless');
+  const w9 = await ev(() => ({ week: app.s.week, card: app.s.card, st: app.s.status, ph: app.phase }));
+  check('week 9: vrij spelen, oude weekkaart leeg', w9.week === 9 && w9.card === null && w9.st === 'endless' && w9.ph === 'prep', JSON.stringify(w9));
+  await ev(() => CC.setSetting('bestScore', { score: 99999 }));
+  await winSetup(); await wait(5500);
+  check('lagere score overschrijft de beste niet', (await ev(() => CC.getSetting('bestScore').score)) === 99999);
+  await click('replay');
+  check('"Opnieuw spelen" start een nieuw spel', (await ev(() => app.phase === 'prep' && app.s.week === 1 && app.s.day === 0 && app.s.status === 'playing')));
+  await ev(() => { while (app.notice) app.closeNotice(); app.setPhase('title'); app.hasSave = CC.hasSave(); });
+  await wait(300); await shot('A7-titel-beste');
+
   check('geen fouten in de console', errors.length === 0, errors.slice(0, 3).join(' | '));
   await browser.close(); server.close();
   console.log(fails ? `\n${fails} FOUT(EN)` : '\nAlles groen.');

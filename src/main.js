@@ -271,7 +271,7 @@
     const s = CC.load(); if (!s) return app.newGame();
     app.s = s; app.rebuildRoom();
     if (s.status === 'bankrupt') return app.setPhase('gameover');
-    if (s.status === 'won') return app.setPhase('won');
+    if (s.status === 'won') { app.recordBest(); return app.setPhase('won'); }   // herladen op het schuldenvrij-scherm: score staat al (of komt er alsnog in)
     if (s.resultOpen && s.history.length) {
       app.summary = s.history[s.history.length - 1];
       app.resultQuip = CC.pickText(app.summary.margin > 60 ? CC.TEXT.result.goodDay : CC.TEXT.result.badDay);
@@ -483,13 +483,21 @@
     app.ring = { t0: app.t };   // eerst gaat de telefoon op de toonbank (M7-juice); klik of Enter slaat over
     app.save();
   };
+  // A7: beste score bewaren in de instellingen (los van de spelsave, net als introSeen).
+  // app.prevBest = de beste score van vóór deze run, zodat het schuldenvrij-scherm "nieuw record" kan zeggen.
+  app.recordBest = function () {
+    const sc = UI.finalScore(app.s).total, prev = CC.getSetting('bestScore');
+    app.prevBest = prev && prev.score ? prev.score : 0;
+    if (sc > app.prevBest) CC.setSetting('bestScore', { score: sc, level: app.s.level, date: new Date().toISOString().slice(0, 10) });
+  };
+  app.bestScore = function () { const b = CC.getSetting('bestScore'); return b && b.score ? b.score : 0; };
   app.ringDur = 1.6;
   app.ringing = function () { if (app.ring && app.t - app.ring.t0 >= app.ringDur) app.ring = null; return !!app.ring; };
   app.bankPay = function () {
     const r = SIM.payWeek(app.s);
     if (!r.ok) return;
     app.save();
-    if (r.won) return app.setPhase('won');
+    if (r.won) { app.recordBest(); return app.setPhase('won'); }
     app.setSunday(Object.assign({}, app.sunday, { stage: 'done', mood: 'happy', text: CC.pickText(CC.TEXT.bank.paid) }));
     app.offerCards();
   };

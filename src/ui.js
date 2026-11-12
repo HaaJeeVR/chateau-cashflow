@@ -1644,7 +1644,7 @@
   UI.wonPanel = function (app, ctx, t) {
     const s = app.s, feest = app.images.schuldenvrij;
     UI.dim(app, ctx, feest && feest.complete && feest.naturalWidth ? 0.25 : 0.55);   // het feestbeeld minder dimmen
-    const w = 400, h = 284, x = 120, y = 36;
+    const w = 400, h = 294, x = 120, y = 30;   // A7: iets hoger voor de regel met de beste score
     UI.rays(ctx, 320, y + 30, 320, app.t, 0.15 * Math.min(1, t / 0.5));
     UI.celebrate(app, x + 10, x + w - 10, y - 10);
     const pop = Math.min(1, t / 0.25), yy0 = y + Math.round((1 - pop) * 24);
@@ -1659,7 +1659,7 @@
     // score als bonnetje: regels lopen één voor één op, dan het totaal
     const sc = UI.finalScore(s);
     const bx = x + 40, bw = w - 80, by = yy0 + 124, rowH = 13;
-    const bh = 20 + sc.rows.length * rowH + 26;
+    const bh = 20 + sc.rows.length * rowH + 26 + 15;   // + regel met de beste score (A7)
     R().rect(ctx, bx + 2, by + 2, bw, bh, 'rgba(31,10,14,0.2)');
     R().rect(ctx, bx - 1, by - 1, bw + 2, bh + 1, P.ink); R().rect(ctx, bx, by, bw, bh, P.cream3);
     for (let i = 0; i < bw; i += 6) { R().rect(ctx, bx + i, by + bh, 3, 2, P.cream3); R().rect(ctx, bx + i + 3, by + bh, 3, 1, P.ink); }
@@ -1679,7 +1679,17 @@
       F().draw(ctx, 'Totaal', bx + 9, ry + 9, P.ink);
       HF().draw(ctx, Math.round(sc.total * (1 - Math.pow(1 - kt, 2))).toLocaleString('nl-NL'), bx + bw - 9, ry + 6, P.bord2, { align: 'right' });
     }
-    if (t > 0.6 + sc.rows.length * 0.3 + 0.6) UI.btn(app, ctx, 'endless', 320 - 70, yy0 + h - 30, 140, 20, 'Verder spelen ▶', () => app.bankNextWeek(), { tone: 'bord' });
+    // A7: beste score (bewaard in de instellingen); nieuw record krijgt een gouden pil
+    if (kt >= 1) {
+      const prev = app.prevBest || 0, rec = sc.total > prev;
+      const txt = rec ? (prev ? `Nieuw record! (was ${prev.toLocaleString('nl-NL')})` : 'Je eerste score') : `beste: ${Math.max(prev, app.bestScore()).toLocaleString('nl-NL')}`;
+      if (rec) { const pw = F().width(txt) + 14; R().pill(ctx, bx + bw / 2 - pw / 2, ry + 22, pw, 12, P.gold, P.ink); }
+      F().draw(ctx, txt, bx + bw / 2, ry + 24, rec ? P.ink : P.stone1, { align: 'center' });
+    }
+    if (t > 0.6 + sc.rows.length * 0.3 + 0.6) {
+      UI.btn(app, ctx, 'replay', 320 - 146, yy0 + h - 30, 140, 20, 'Opnieuw spelen', () => app.newGame(), { tone: 'wood', tip: 'Een nieuwe run van 8 weken' });
+      UI.btn(app, ctx, 'endless', 320 + 6, yy0 + h - 30, 140, 20, 'Verder spelen ▶', () => app.bankNextWeek(), { tone: 'bord', tip: 'Vrij doorspelen met deze winkel' });
+    }
   };
 
   // ---------- Titelscherm: sfeer ----------
@@ -1763,6 +1773,8 @@
       R().rect(ctx, 0, 286, 640, 74, 'rgba(31,10,14,0.72)');
       R().rect(ctx, 0, 286, 640, 1, P.wood2);
       F().draw(ctx, CC.TEXT.tagline, 320, 294, P.cream2, { align: 'center', shadow: P.ink });
+      const best = app.bestScore && app.bestScore();   // A7
+      if (best) F().draw(ctx, `Beste score: ${best.toLocaleString('nl-NL')}`, 10, 347, P.gold, { shadow: P.ink });
       if (app.hasSave) {
         UI.btn(app, ctx, 'cont', 176, 312, 136, 22, 'Doorgaan', () => app.continueGame(), { tone: 'bord' });
         UI.btn(app, ctx, 'new', 328, 312, 136, 22, 'Nieuw spel', () => app.askNewGame(), { tone: 'wood' });
@@ -1787,7 +1799,7 @@
 
   // Onderste regel van het titelscherm: versie links, spelcode en reservekopie rechts (klein, rustig).
   UI.titleFooter = function (app, ctx, y) {
-    if (CC.DBG && CC.DBG.allowed) F().draw(ctx, 'Versie ' + CC.VERSION + ' · F1 = debug', 10, y + 3, P.stone1);   // alleen met ?debug (besluit 93)
+    if (CC.DBG && CC.DBG.allowed) F().draw(ctx, 'Versie ' + CC.VERSION + ' · F1 = debug', 10, y - 9, P.stone1);   // alleen met ?debug (besluit 93); boven de beste score
     let bx = 634;
     const small = (id, label, fn, tip) => { const w = F().width(label) + 14; bx -= w; UI.btn(app, ctx, id, bx, y, w, 13, label, fn, { tone: 'wood', tip }); bx -= 4; };
     small('code_in', 'Code laden', () => app.openCode('import'), 'Een spel inladen vanaf een spelcode');
