@@ -24,7 +24,7 @@ const server = http.createServer((req, res) => {
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const wait = ms => page.waitForTimeout(ms);
   const frames = (n = 2) => ev(n => new Promise(r => { const f = k => k ? requestAnimationFrame(() => f(k - 1)) : r(); f(n); }), n);
-  const shot = async name => { if (SHOTS) await page.locator('#game').screenshot({ path: path.join(SHOTS, name + '.png') }); };
+  const shot = async name => { if (!SHOTS) return; await page.mouse.move(2, 700); await frames(2); await page.locator('#game').screenshot({ path: path.join(SHOTS, name + '.png') }); };
   const hit = async id => { await frames(2); return ev(id => { const h = CC.UI.hits.find(h => h.id === id); return h && { x: h.x, y: h.y, w: h.w, h: h.h, on: !!h.onClick, tip: h.tip }; }, id); };
   const click = async id => {
     const h = await hit(id); if (!h) return false;
@@ -91,7 +91,61 @@ const server = http.createServer((req, res) => {
     s.weekKlus = { id: 'wk_flessen', week: s.week - 1, need: 5, n: 0, done: false }; out.stale = S.weekKlusOpen(s);
     return out;
   });
-  check('beloningen: +20 reputatie, +€60, en een klus van vorige week telt niet meer', rw.rep === 20 && rw.cash === 60 && rw.stale === null, JSON.stringify(rw));
+  check('beloningen: +25 reputatie (klanttype), +€100 (flessen), en een klus van vorige week telt niet meer', rw.rep === 25 && rw.cash === 100 && rw.stale === null, JSON.stringify(rw));
+  // de nieuwe soorten tellen uit het dagrapport
+  const kinds = await ev(() => {
+    const S = CC.SIM, s = app.s, out = {};
+    const run = (k, prep) => { s.weekKlus = Object.assign({ week: s.week, n: 0, done: false }, k); const log = S.newDayLog(); prep(log); S.klusDay(s, log, {}); return s.weekKlus; };
+    out.winst = run({ id: 'wk_winst', need: 500 }, l => { l.dayProfit = 180; }).n;
+    out.verlies = (() => { s.weekKlus.n = 180; const log = S.newDayLog(); log.dayProfit = -40; S.klusDay(s, log, {}); return s.weekKlus.n; })();
+    out.duur = run({ id: 'wk_duur', need: 10 }, l => { l.perWine = { wine_barolo: 3, wine_merlot: 9 }; l.prices = { wine_barolo: 24, wine_merlot: 6 }; }).n;
+    out.advies = run({ id: 'wk_advies', need: 6 }, l => { l.advice = { good: 2 }; }).n;
+    out.bubbels = run({ id: 'wk_bubbels', need: 12 }, l => { l.perWine = { wine_cremant: 4, wine_champagne: 2, wine_merlot: 9 }; }).n;
+    // wk_op: na drie dagen met een lege plank niet meer haalbaar
+    s.weekKlus = { id: 'wk_op', week: s.week, need: 4, n: 0, done: false };   // lat 4: na drie gemiste dagen klaar (bij lat 2 na vijf)
+    for (const so of [0, 3, 1, 2]) { const log = S.newDayLog(); log.soldOut = so; S.klusDay(s, log, {}); }
+    out.op = { n: s.weekKlus.n, miss: s.weekKlus.miss, dead: !!s.weekKlus.dead };
+    return out;
+  });
+  check('winst telt per dag, een verliesdag telt mee', kinds.winst === 180 && kinds.verlies === 140, JSON.stringify(kinds));
+  check('duur: alleen flessen van €20+; advies: goede antwoorden; bubbels: Crémant + Champagne', kinds.duur === 3 && kinds.advies === 2 && kinds.bubbels === 6);
+  check('wk_op: na drie gemiste dagen niet meer haalbaar', kinds.op.n === 1 && kinds.op.miss === 3 && kinds.op.dead, JSON.stringify(kinds.op));
+  await ev(() => { app.s.weekKlus = { id: 'wk_op', week: app.s.week, need: 4, n: 1, miss: 3, dead: true, done: false }; app.s.klussen = [{ lvl: 5, n: 2 }]; app.closePanel(); });
+  const dead = await hit('klus_wk');
+  check('wk_op grijs op het klussenpaneel, met uitleg', dead && /Niet meer haalbaar/.test(dead.tip || ''), dead && dead.tip);
+  await shot('B1-wk_op-grijs');
+  // zondag met een klus die niet gehaald is: eerst die regel, dan de nieuwe klus
+  await ev(() => { const s = app.s; s.day = 6; s.cash = Math.max(s.cash, 2000); s.weekKlus = { id: 'wk_winst', giver: 'bankier', week: s.week, need: 900, n: 400, done: false }; s.sun = null; app.openSunday(); app.ring = null; });
+  await click('pay'); await wait(1800);
+  const fl = await ev(() => ({ next: app.s.nextWeekKlus, cur: app.s.weekKlus }));
+  check('zondag: niet gehaald + nieuwe klus van een andere opdrachtgever', fl.next && fl.next.giver === 'ronnie' && !!(await hit('weekklus_next')), JSON.stringify(fl.next));
+  await shot('B1-zondag-niet-gehaald');
+  // score: 50 punten per weekklus
+  const sc = await ev(() => { app.s.weekKlusDone = 3; const f = CC.UI.finalScore(app.s); return f.rows.find(r => r.l === CC.TEXT.weekKlus.scoreRow); });
+  check('score: 3 weekklussen = 150 punten', sc && sc.p === 150, JSON.stringify(sc));
+  // voorwaarden en opdrachtgever over veel staten
+  const cond = await ev(() => {
+    const S = CC.SIM; let bad = [], same = 0, seen = {};
+    for (let seed = 1; seed <= 300; seed++) {
+      const s = CC.newState(seed); s.level = 1 + seed % 8; s.week = 4 + seed % 4; s.status = 'playing';
+      if (seed % 2) s.upgrades = { kast3: true, kast4: seed % 4 === 1 };
+      CC.SIM.unlockedWines(s).slice(-(2 + seed % 7)).forEach((w, i) => { const v = S.activeVakIds(s)[i]; if (v) { S.buy(s, w.id, 6); S.assignVak(s, v, w.id); } });
+      if (seed % 3 === 0 && S.staffUnlocked(s, 'fatima')) s.staff = { fatima: { xp: 0, level: 1 } };
+      for (let d = 0; d < 6; d++) s.history.push({ week: s.week - 1, day: d, bottles: 30, profit: seed % 5 ? 60 : -10, wines: {}, types: {}, stands: {}, work: {} });
+      const prevs = CC.WEEKKLUS.list.map(x => x.id);
+      s.weekKlus = { id: prevs[seed % 9], week: s.week - 1, done: true };
+      const k = S.planWeekKlus(s, s.week); if (!k) continue;
+      seen[k.id] = 1;
+      if (!S.weekKlusOk(s, k)) bad.push(seed + ':' + k.id);
+      if (k.id === s.weekKlus.id) bad.push(seed + ':zelfde');
+      const g0 = S.weekKlusDef(s.weekKlus.id).giver;
+      const others = CC.WEEKKLUS.list.filter(x => x.giver !== g0 && x.id !== s.weekKlus.id);
+      if (k.giver === g0) same++;
+    }
+    return { bad, same, seen: Object.keys(seen).length, ids: Object.keys(seen).join(',') };
+  });
+  check('nooit een klus zonder voorwaarde of twee keer dezelfde', cond.bad.length === 0, cond.bad.slice(0, 5).join(' '));
+  check('alle negen klussen komen voor', cond.seen === 9, cond.ids);
   // deterministisch: zondag en startWeek kiezen dezelfde klus
   const det = await ev(() => { const S = CC.SIM, s = app.s; const a = S.planWeekKlus(s, s.week + 1), b = S.planWeekKlus(s, s.week + 1); return JSON.stringify(a) === JSON.stringify(b); });
   check('weekklus is deterministisch per seed en week', det);

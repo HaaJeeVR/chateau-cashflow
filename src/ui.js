@@ -432,7 +432,7 @@
     const nWines = Math.min(4, Object.keys(sm.wines || {}).filter(id => sm.wines[id].sold > 0).length) || 1;
     const bonH = 30 + 20 + 10 + (due > 0 ? 11 : 0) + 15 + nWines * 10 + (3 + (adv.tips > 0 ? 1 : 0) + (sm.wages > 0 ? 1 : 0)) * 10 + (1 + (sm.invest > 0 ? 1 : 0) + (sm.bought > 0 || !(sm.invest > 0) ? 1 : 0)) * 10 + 4;
     const ins = app.insightFor === sm ? app.insight : (app.insightFor = sm, app.insight = CC.SIM.insight(s, sm));
-    const rightH = 2 + 52 + (adv.asked > 0 ? 11 : 0) + 43 + (sm.week === 1 && sm.day === 0 ? 40 : 0) + (sm.klusDone || []).length * 14 + (ins ? 58 : 0) + (nShop ? 18 + nShop * 11 : 0) + (nStaff ? 14 + nStaff * 20 : 0) + 4;
+    const rightH = 2 + 52 + (adv.asked > 0 ? 11 : 0) + 43 + (sm.week === 1 && sm.day === 0 ? 40 : 0) + (sm.klusDone || []).reduce((a, kd) => a + (kd.wk ? (l => l.text.length * 10 + l.quote.length * 10 + 6)(UI.weekKlusDoneLines(kd, 204)) : 14), 0) + (ins ? 58 : 0) + (nShop ? 18 + nShop * 11 : 0) + (nStaff ? 14 + nStaff * 20 : 0) + 4;
     const W = 448, H = Math.min(312, Math.max(306, bonH + 44, rightH + 44)), X = 96, y0 = 20;   // altijd groot (wens HJ); lege ruimte mag
     const slide = Math.min(1, t / 0.35), ease = 1 - Math.pow(1 - slide, 3);
     const y = Math.round(360 + (y0 - 360) * ease);
@@ -528,9 +528,19 @@
     }
     ry += 3;
     for (const kd of sm.klusDone || []) {   // klus gehaald: groen vinkje
+      if (kd.wk) {   // B1: weekklus, tekst over twee regels en wat de opdrachtgever zegt
+        const L = UI.weekKlusDoneLines(kd, rw), kr = kd.rep ? `+${kd.rep} ★` : kd.discount ? `-${Math.round(kd.discount * 100)}%` : '+' + R().euro(kd.cash);
+        const bh = L.text.length * 10 + L.quote.length * 10 + 4;
+        R().round(ctx, rx, ry - 2, rw, bh, 4, '#e9f2dc');
+        L.text.forEach((l, i) => F().draw(ctx, l, rx + 4, ry + i * 10, P.green2));
+        F().draw(ctx, kr, rx + rw - 4, ry, P.green2, { align: 'right' });
+        L.quote.forEach((l, i) => F().draw(ctx, l, rx + 4, ry + (L.text.length + i) * 10, P.wood2));
+        ry += bh + 2;
+        continue;
+      }
       R().round(ctx, rx, ry - 2, rw, 12, 4, '#e9f2dc');
-      const kr = kd.rep ? `+${kd.rep} ★` : kd.discount ? `-${Math.round(kd.discount * 100)}%` : '+' + R().euro(kd.cash), maxW = rw - F().width(kr) - 16;
-      let kt = '✔ ' + (kd.wk ? UI.weekKlusText({ id: kd.wk, need: kd.need, type: (s.weekKlus || {}).type }) : UI.klusText(kd.lvl)); while (F().width(kt) > maxW && kt.length > 4) kt = kt.slice(0, -2) + '.';
+      const kr = kd.rep ? `+${kd.rep} ★` : '+' + R().euro(kd.cash), maxW = rw - F().width(kr) - 16;
+      let kt = '✔ ' + UI.klusText(kd.lvl); while (F().width(kt) > maxW && kt.length > 4) kt = kt.slice(0, -2) + '.';
       F().draw(ctx, kt, rx + 4, ry, P.green2);
       F().draw(ctx, kr, rx + rw - 4, ry, P.green2, { align: 'right' });
       ry += 14;
@@ -728,31 +738,48 @@
     if (ref.type) return { kind: 'type', id: ref.type, a: CC.TEXT.typeInfo[ref.type].many };
     return null;
   }
-  // B1: weekklus
-  UI.weekKlusText = function (k) {
-    const T = CC.TEXT.weekKlus, types = k.type ? CC.TEXT.typeInfo[k.type].many : '';
-    return (T[k.id] || k.id).split('{need}').join(k.need).split('{types}').join(types);
-  };
+  // B1: weekklus (teksten: claude/12_WEEKKLUSSEN.md §4)
+  const wkFill = (t, k) => t.split('{need}').join(k.need).split('{types}').join(k.type ? CC.TEXT.typeInfo[k.type].many : '');
+  UI.weekKlusText = function (k) { return wkFill(CC.TEXT.weekKlus.text[k.id] || k.id, k); };
   UI.weekKlusReward = function (k) {
     const r = CC.SIM.weekKlusDef(k.id).reward, T = CC.TEXT.weekKlus;
     return r.cash ? T.cash.split('{n}').join(R().euro(r.cash)) : r.rep ? T.rep.split('{n}').join(r.rep) : T.discount.split('{n}').join(Math.round(r.discount * 100));
   };
   UI.weekKlusTip = function (k) {
     const d = CC.SIM.weekKlusDef(k.id), T = CC.TEXT.weekKlus;
+    if (k.dead) return T.dead;
     return T.tip.split('{from}').join(T.from[d.giver]).split('{text}').join(UI.weekKlusText(k)).split('{reward}').join(UI.weekKlusReward(k));
   };
-  // Zondag: welke klus komt er volgende week? Strook met wie hem geeft, de klus en de beloning
-  UI.weekKlusStrip = function (app, ctx, y) {
-    const k = app.s.nextWeekKlus; if (!k) return;
-    const d = CC.SIM.weekKlusDef(k.id), T = CC.TEXT.weekKlus;
-    const head = T.sunday.split('{from}').join(T.from[d.giver]).split('{week}').join(k.week);
-    const body = UI.weekKlusText(k) + ' · ' + UI.weekKlusReward(k);
-    const w = Math.max(F().width(head), F().width(body)) + 28, x = 320 - Math.round(w / 2), h = 28;
+  // Zondag: de klus van deze week niet gehaald (één regel van wie hem gaf), en de opdrachtgever kondigt de nieuwe aan
+  UI.weekKlusStrip = function (app, ctx, minY) {
+    const s = app.s, k = s.nextWeekKlus, T = CC.TEXT.weekKlus;
+    const cur = s.weekKlus && s.weekKlus.week === s.week && !s.weekKlus.done ? s.weekKlus : null;
+    if (!k && !cur) return;
+    const w = 396, x = 320 - w / 2, iw = w - 24;
+    const failL = cur ? F().wrap(T.failed[CC.SIM.weekKlusDef(cur.id).giver], iw) : [];
+    const d = k && CC.SIM.weekKlusDef(k.id);
+    const head = k ? T.head.split('{week}').join(k.week).split('{text}').join(UI.weekKlusText(k)) : '', rew = k ? UI.weekKlusReward(k) : '';
+    const quoteL = k ? F().wrap(T.from[d.giver] + ': ' + wkFill(T.announce[k.id], k), iw).slice(0, 3) : [];
+    const split = k && F().width(head) + F().width(rew) + 16 > iw;   // past de beloning niet naast de klus, dan eronder
+    const h = 8 + failL.length * 10 + (failL.length && k ? 4 : 0) + (k ? 12 + (split ? 10 : 0) + quoteL.length * 10 : 0);
+    const y = Math.max(minY, 352 - h);
     R().round(ctx, x + 2, y + 3, w, h, 6, 'rgba(31,10,14,0.35)');
     R().round(ctx, x, y, w, h, 6, P.ink); R().round(ctx, x + 1, y + 1, w - 2, h - 2, 5, P.wood1); R().round(ctx, x + 2, y + 2, w - 4, h - 4, 5, 'rgba(31,10,14,0.92)');
-    F().draw(ctx, head, 320, y + 5, P.gold, { align: 'center' });
-    F().draw(ctx, body, 320, y + 16, P.cream2, { align: 'center' });
-    UI.hit(app, 'weekklus_next', x, y, w, h, null, UI.weekKlusTip(k));
+    let yy = y + 5;
+    failL.forEach(l => { F().draw(ctx, l, x + 12, yy, P.stone1); yy += 10; });
+    if (k) {
+      if (failL.length) { R().rect(ctx, x + 12, yy, iw, 1, 'rgba(232,181,58,0.3)'); yy += 4; }
+      F().draw(ctx, head, x + 12, yy, P.gold);
+      if (split) { yy += 10; F().draw(ctx, 'Beloning: ' + rew, x + 12, yy, P.gold2); } else F().draw(ctx, rew, x + w - 12, yy, P.gold2, { align: 'right' });
+      yy += 12;
+      quoteL.forEach(l => { F().draw(ctx, l, x + 12, yy, P.cream2); yy += 10; });
+      UI.hit(app, 'weekklus_next', x, y, w, h, null, UI.weekKlusTip(k));
+    }
+  };
+  // Dagrapport: regels van een gehaalde weekklus (✔ tekst, twee regels toegestaan, en wat de opdrachtgever zegt)
+  UI.weekKlusDoneLines = function (kd, rw) {
+    const k = { id: kd.wk, need: kd.need, type: kd.type };
+    return { text: F().wrap('✔ ' + UI.weekKlusText(k), rw - 50).slice(0, 2), quote: F().wrap(CC.TEXT.weekKlus.done[kd.wk] || '', rw - 8).slice(0, 2) };
   };
   UI.klusText = function (lvl) { const d = CC.SIM.klusDef(lvl); return d ? CC.TEXT.klus[lvl].split('{need}').join(d.need) : ''; };
   UI.klusReward = function (lvl) { const d = CC.SIM.klusDef(lvl), U = CC.TEXT.klusUi; return d.rep ? U.repR.split('{n}').join(d.rep) : U.cashR.split('{n}').join(R().euro(d.cash)); };
@@ -849,12 +876,12 @@
     let ky = y + 17;
     rows.forEach(({ k, txt, ls, h: rh, week }) => {
       const d = week ? { need: k.need } : CC.SIM.klusDef(k.lvl);
-      ls.forEach((l, j) => F().draw(ctx, l, x + 8, ky + j * 10, week ? P.gold2 : P.cream2));
+      ls.forEach((l, j) => F().draw(ctx, l, x + 8, ky + j * 10, week ? (k.dead ? P.stone1 : P.gold) : P.cream2));
       if (week) UI.hit(app, 'klus_wk', x + 3, ky - 2, w - 6, rh - 2, null, UI.weekKlusTip(k));
       else UI.hit(app, 'klus_' + k.lvl, x + 3, ky - 2, w - 6, rh - 2, null, `${txt} · ${UI.klusReward(k.lvl)} (klus van niveau ${k.lvl})`);
       const by = ky + ls.length * 10, bw = w - 66, f = Math.min(1, k.n / d.need);
-      R().rect(ctx, x + 8, by, bw, 4, P.wood1); R().rect(ctx, x + 8, by, Math.round(bw * f), 4, P.gold);
-      F().draw(ctx, `${k.n}/${d.need}`, x + w - 8, by - 1, P.cream2, { align: 'right' });
+      R().rect(ctx, x + 8, by, bw, 4, P.wood1); R().rect(ctx, x + 8, by, Math.round(bw * f), 4, week && k.dead ? P.stone1 : P.gold);
+      F().draw(ctx, week && k.dead ? '✘' : `${k.n}/${d.need}`, x + w - 8, by - 1, week && k.dead ? P.stone1 : P.cream2, { align: 'right' });
       ky += rh;
       if (week && rows.length > 1) R().rect(ctx, x + 8, ky - 4, w - 16, 1, 'rgba(232,181,58,0.35)');   // weekklus (goud) los van de niveauklussen
     });
@@ -1514,7 +1541,7 @@
       UI.btn(app, ctx, 'newweek', 320 - 80, y0 + CH + 12, 160, 20, `Zonder kaart naar week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
     }
     if (s.postponed && s.status === 'playing' && t > 1.2) UI.restartBtn(app, ctx, 640 - 124, 334, 116, 18);   // A8: rechtsonder, uit de weg
-    if (!sun.chosen && t > 1.2) UI.weekKlusStrip(app, ctx, 312);   // B1: de klus voor volgende week
+    if (!sun.chosen && t > 1.2) UI.weekKlusStrip(app, ctx, !app.canAffordCard() ? 310 : 280);   // B1: niet gehaald + de klus voor volgende week
     if (sun.chosen === 'doos' && s.card && s.card.box && ct > 1.1) { UI.boxReveal(app, ctx, ct - 1.1); return; }   // A10
     if (sun.chosen && ct > 1.1) {
       const T = CC.TEXT.cards[sun.chosen];
@@ -1740,6 +1767,7 @@
       { l: 'Niveau', d: String(s.level), p: s.level * 100 },
       { l: 'Flessen verkocht', d: String(s.totals.bottles), p: s.totals.bottles },
       { l: 'Klussen gehaald', d: String(klus), p: klus * 50 },
+      { l: CC.TEXT.weekKlus.scoreRow, d: String(s.weekKlusDone || 0), p: (s.weekKlusDone || 0) * 50 },   // B1: 50 punten per gehaalde weekklus
       { l: 'Zonder uitstel', d: s.postponed ? 'nee' : 'ja', p: s.postponed ? 0 : 250 },
     ];
     return { rows, total: rows.reduce((a, r) => a + r.p, 0) };
@@ -1747,7 +1775,7 @@
   UI.wonPanel = function (app, ctx, t) {
     const s = app.s, feest = app.images.schuldenvrij;
     UI.dim(app, ctx, feest && feest.complete && feest.naturalWidth ? 0.25 : 0.55);   // het feestbeeld minder dimmen
-    const w = 400, h = 294, x = 120, y = 30;   // A7: iets hoger voor de regel met de beste score
+    const w = 400, h = 308, x = 120, y = 24;   // A7/B1: ruimte voor de beste score en de regel weekklussen
     UI.rays(ctx, 320, y + 30, 320, app.t, 0.15 * Math.min(1, t / 0.5));
     UI.celebrate(app, x + 10, x + w - 10, y - 10);
     const pop = Math.min(1, t / 0.25), yy0 = y + Math.round((1 - pop) * 24);

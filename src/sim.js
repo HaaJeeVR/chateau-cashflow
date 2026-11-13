@@ -718,6 +718,11 @@
     if (def.kind === 'type') return ((log.types || {})[def.type] || {}).bottles || 0;
     if (def.kind === 'variety') return Object.keys(W).filter(id => W[id] > 0).length;
     if (def.kind === 'fatima') return ((work || {}).fatima || {}).saved || 0;
+    // B1 (weekklussen): uit wat het dagrapport al heeft
+    if (def.kind === 'profit') return log.dayProfit || 0;
+    if (def.kind === 'pricey') return Object.keys(W).reduce((a, id) => a + (log.prices && log.prices[id] >= def.price ? W[id] : 0), 0);
+    if (def.kind === 'advice') return ((log.advice || {}).good) || 0;
+    if (def.kind === 'noSoldOut') return log.soldOut ? 0 : 1;
     return 0;
   };
   // Einde dag: alle open klussen bijwerken. Geeft per klus { lvl, n, need, gained, now } terug; gehaalde klussen gaan van de lijst.
@@ -737,13 +742,16 @@
     s.klussen = s.klussen.filter(k => k.n < SIM.klusDef(k.lvl).need);
     // B1: weekklus
     const wk = SIM.weekKlusOpen(s);
-    if (wk) {
-      const def = SIM.weekKlusDef(wk.id), c = SIM.klusCount({ kind: def.kind, type: wk.type }, log, work);
-      wk.n = Math.min(wk.need, def.kind === 'variety' ? Math.max(wk.n, c) : wk.n + c);
+    if (wk && !wk.dead) {
+      const def = SIM.weekKlusDef(wk.id), c = SIM.klusCount(Object.assign({}, def, { type: wk.type }), log, work);
+      if (def.kind === 'variety') wk.n = Math.max(wk.n, c);
+      else wk.n = wk.n + c;   // winst: een verliesdag telt gewoon mee
+      if (def.kind === 'noSoldOut') { wk.miss = (wk.miss || 0) + (c ? 0 : 1); if (wk.miss > C().daysPerWeek - wk.need) wk.dead = true; }   // na drie gemiste dagen niet meer haalbaar
+      wk.n = Math.min(wk.need, wk.n);
       const now = wk.n >= wk.need;
       let r = {};
       if (now) { wk.done = true; r = SIM.weekKlusReward(s, wk, log); }
-      out.push({ wk: wk.id, n: wk.n, need: wk.need, gained: c, now, rep: now ? r.rep || 0 : 0, cash: now ? r.cash || 0 : 0, discount: now ? r.discount || 0 : 0 });
+      out.push({ wk: wk.id, type: wk.type, n: wk.n, need: wk.need, gained: c, now, rep: now ? r.rep || 0 : 0, cash: now ? r.cash || 0 : 0, discount: now ? r.discount || 0 : 0 });
     }
     return out;
   };
@@ -751,6 +759,19 @@
   // Elke week vanaf CC.WEEKKLUS.from één klus, gekozen op de zondag ervoor. De lat hangt aan wat je vorige week deed,
   // zodat hij op elk niveau iets vraagt. Deterministisch per seed en week: zondag (planning) en startWeek kiezen hetzelfde.
   SIM.weekKlusDef = function (id) { return CC.WEEKKLUS.list.find(d => d.id === id) || null; };
+  // Wat deed je vorige week? (zelfde maten als SIM.klusCount, maar uit de daghistorie)
+  const pricey = (h, minP) => Object.keys(h.wines || {}).reduce((a, id) => { const st = (h.stands || {})[id] || 'normaal', w = CC.wineById(id); return a + (w && CC.priceFor(w, st) >= minP ? h.wines[id].sold || 0 : 0); }, 0);
+  SIM.weekKlusLast = function (d, last, k) {
+    const sum = f => last.reduce((a, h) => a + (f(h) || 0), 0);
+    if (d.kind === 'bottles') return sum(h => h.bottles);
+    if (d.kind === 'profit') return sum(h => h.profit);
+    if (d.kind === 'pricey') return sum(h => pricey(h, d.price));
+    if (d.kind === 'type') return sum(h => ((h.types || {})[k.type] || {}).bottles);
+    if (d.kind === 'fatima') return sum(h => (((h.work || {}).fatima) || {}).saved);
+    if (d.kind === 'wine') return sum(h => d.wines.reduce((a, id) => a + (((h.wines || {})[id] || {}).sold || 0), 0));
+    if (d.kind === 'variety') return Math.max(0, ...last.map(h => Object.keys(h.wines || {}).filter(id => h.wines[id].sold > 0).length));
+    return 0;
+  };
   SIM.planWeekKlus = function (s, week) {
     const W = CC.WEEKKLUS;
     if (week < W.from || week > C().repay.length || (s.status !== 'playing' && s.status !== 'won')) return null;
@@ -758,18 +779,40 @@
     const rng = CC.makeRng({ rng: ((s.seed || 1) * 7919 + week * 104729) >>> 0 });
     const types = Object.keys(CC.CUSTOMER_TYPES).filter(k => CC.CUSTOMER_TYPES[k].minLevel <= s.level && k !== 'buurt');
     const vaks = SIM.activeVakIds(s).length;
-    const prevId = s.weekKlus && s.weekKlus.week === week - 1 ? s.weekKlus.id : null;
-    const ok = W.list.filter(d => d.id !== prevId && (d.kind !== 'type' || types.length) && (d.kind !== 'variety' || vaks >= d.min));
+    const prev = s.weekKlus && s.weekKlus.week === week - 1 ? s.weekKlus : null;
+    const prevGiver = prev && SIM.weekKlusDef(prev.id) ? SIM.weekKlusDef(prev.id).giver : null;
+    const can = d => {   // voorwaarden uit 12_WEEKKLUSSEN §3
+      if (prev && d.id === prev.id) return false;
+      if (d.kind === 'type') return types.length > 0;
+      if (d.kind === 'profit') return last.reduce((a, h) => a + (h.profit || 0), 0) > 0;
+      if (d.kind === 'pricey') return SIM.listed(s).some(l => CC.priceFor(l.wine, 'normaal') >= d.price);
+      if (d.kind === 'fatima') return SIM.hired(s, 'fatima');
+      if (d.kind === 'variety') return vaks >= d.min && SIM.weekKlusLast(d, last) < vaks;
+      if (d.kind === 'wine') return SIM.unlockedWines(s).some(w => w.id === d.wines[0]);
+      return true;
+    };
+    let ok = W.list.filter(can);
+    const other = ok.filter(d => d.giver !== prevGiver);   // ook niet twee weken achter elkaar dezelfde opdrachtgever
+    if (other.length) ok = other;
     if (!ok.length) return null;
-    const d = ok[Math.floor(rng() * ok.length)], k = { id: d.id, week, n: 0, done: false };
-    const up5 = x => Math.ceil(x / 5) * 5;
-    if (d.kind === 'bottles') k.need = Math.max(d.min, up5(last.reduce((a, h) => a + (h.bottles || 0), 0) * d.grow));
-    if (d.kind === 'type') {
-      k.type = types[Math.floor(rng() * types.length)];
-      k.need = Math.max(d.min, Math.ceil(last.reduce((a, h) => a + (((h.types || {})[k.type] || {}).bottles || 0), 0) * d.grow));
-    }
-    if (d.kind === 'variety') k.need = Math.min(vaks, Math.max(d.min, Math.max(0, ...last.map(h => Object.keys(h.wines || {}).filter(id => h.wines[id].sold > 0).length)) + (d.plus || 0)));
+    const d = ok[Math.floor(rng() * ok.length)], k = { id: d.id, week, n: 0, done: false, giver: d.giver };
+    if (d.kind === 'type') k.type = types[Math.floor(rng() * types.length)];
+    const up = (x, r) => Math.ceil(x / (r || 1)) * (r || 1);
+    if (d.fixed) k.need = d.fixed;
+    else if (d.kind === 'variety') k.need = Math.min(vaks, Math.max(d.min, SIM.weekKlusLast(d, last) + (d.plus || 0)));
+    else k.need = Math.max(d.min, up(SIM.weekKlusLast(d, last, k) * (d.grow || 1), d.round));
     return k;
+  };
+  // Klopt de voorwaarde van een klus nog op het moment dat de week begint? (controle voor tests en de balanssimulatie)
+  SIM.weekKlusOk = function (s, k) {
+    const d = SIM.weekKlusDef(k.id); if (!d) return false;
+    if (d.kind === 'type') return !!k.type && CC.CUSTOMER_TYPES[k.type].minLevel <= s.level;
+    if (d.kind === 'pricey') return SIM.listed(s).some(l => CC.priceFor(l.wine, 'normaal') >= d.price) || s.week > k.week;
+    if (d.kind === 'fatima') return SIM.hired(s, 'fatima');
+    if (d.kind === 'variety') return SIM.activeVakIds(s).length >= d.min && k.need <= SIM.activeVakIds(s).length;
+    if (d.kind === 'wine') return SIM.unlockedWines(s).some(w => w.id === d.wines[0]);
+    if (d.kind === 'profit') return k.need >= d.min;
+    return true;
   };
   // Zondag: de klus voor volgende week vastleggen (staat in de save, zodat herladen hetzelfde laat zien)
   SIM.offerWeekKlus = function (s) {
@@ -798,6 +841,8 @@
     const work = SIM.staffWork(s, log);
     const staffUp = SIM.staffWorkDay(s, log, work);
     // klus van dit niveau bijwerken; gehaald = bonusreputatie (of geld op het hoogste niveau)
+    log.dayProfit = log.revenue - log.cogs + adv.tips - rent - wages;   // B1: weekklus "winst"
+    log.prices = Object.fromEntries(SIM.listed(s).map(l => [l.wine.id, SIM.price(s, l.wine.id)]));   // B1: weekklus "duur"
     const klus = SIM.klusDay(s, log, work);
     const oldLevel = s.level;
     s.level = Math.max(s.level, SIM.levelFor(s.rep));

@@ -122,16 +122,24 @@
   ];
   CC.upgradeById = id => CC.UPGRADES.find(u => u.id === id);
 
-  // Weekklus (B1, handoff na review 2): elke zondag één klus voor de komende week, naast de niveauklussen.
-  // De lat ligt net boven wat je vorige week deed (grow = factor, plus = extra), met een ondergrens (min).
+  // Weekklus (B1, handoff na review 2; lijst, hoogtes en beloningen: claude/12_WEEKKLUSSEN.md).
+  // Elke zondag vanaf week 3 één klus voor de komende week, naast de niveauklussen. De lat hangt aan vorige week:
+  // grow = factor op wat je vorige week deed, plus = extra, min = ondergrens, round = afronden naar boven op een veelvoud,
+  // fixed = vaste lat. Wat je zelf stuurt mag iets vragen; wat vooral van de toeloop afhangt blijft dicht bij vorige week.
   // Beloning: cash (euro), rep (reputatie) of discount (eenmalige korting op je volgende bestelling).
-  // Drie voorbeeldklussen van bestaande typen; Fable levert de volledige lijst.
   CC.WEEKKLUS = {
     from: 4,   // eerste week met een weekklus (je krijgt hem op de zondag ervoor); week 1–3 blijven zoals ze zijn
     list: [
-      { id: 'wk_flessen', giver: 'bankier', kind: 'bottles', grow: 1.15, min: 40, reward: { cash: 60 } },
-      { id: 'wk_type', giver: 'bankier', kind: 'type', grow: 1.25, min: 8, reward: { rep: 20 } },
+      { id: 'wk_flessen', giver: 'bankier', kind: 'bottles', grow: 1.10, min: 40, round: 5, reward: { cash: 100 } },
+      { id: 'wk_winst', giver: 'bankier', kind: 'profit', grow: 1.10, min: 150, round: 10, reward: { cash: 120 } },
+      { id: 'wk_duur', giver: 'bankier', kind: 'pricey', grow: 1.20, min: 6, price: 20, reward: { cash: 150 } },
+      { id: 'wk_type', giver: 'bankier', kind: 'type', grow: 1.10, min: 8, reward: { rep: 25 } },
+      { id: 'wk_advies', giver: 'bankier', kind: 'advice', fixed: 6, reward: { rep: 25 } },
+      { id: 'wk_fatima', giver: 'bankier', kind: 'fatima', grow: 1.20, min: 8, reward: { rep: 20 } },
       { id: 'wk_variety', giver: 'ronnie', kind: 'variety', plus: 1, min: 5, reward: { discount: 0.15 } },
+      // bubbels: min 12 → 8 en op: 4 → 2 dagen (bot "alles" haalde ze 39% en 8%; 12_WEEKKLUSSEN §2: niet onder 40%)
+      { id: 'wk_bubbels', giver: 'ronnie', kind: 'wine', wines: ['wine_cremant', 'wine_champagne'], grow: 1.20, min: 8, reward: { discount: 0.15 } },
+      { id: 'wk_op', giver: 'ronnie', kind: 'noSoldOut', fixed: 2, reward: { discount: 0.20 } },
     ],
   };
 

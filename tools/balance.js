@@ -335,7 +335,7 @@ function run(botName, seed) {
       const lv0 = s.level;
       const sm = S.endDay(s, d.log);
       if (s.level > lv0) for (let L = lv0 + 1; L <= s.level; L++) (STAT.lvDay[L] = STAT.lvDay[L] || []).push((s.week - 1) * C.daysPerWeek + s.day + 1);
-      for (const k of sm.klusDone || []) { if (k.wk) STAT.wkDone++; else STAT.klus[k.lvl] = (STAT.klus[k.lvl] || 0) + 1; }
+      for (const k of sm.klusDone || []) { if (k.wk) { STAT.wkDone++; STAT.wkDoneBy[k.wk] = (STAT.wkDoneBy[k.wk] || 0) + 1; } else STAT.klus[k.lvl] = (STAT.klus[k.lvl] || 0) + 1; }
       for (const id in sm.work || {}) { STAT.xp[id] = (STAT.xp[id] || 0) + sm.work[id].xp; STAT.xpd[id] = (STAT.xpd[id] || 0) + 1; STAT.gain[id] = (STAT.gain[id] || 0) + (sm.work[id].margin || 0); }
       STAT.upg += ((sm.src || {}).upg || {}).margin || 0;
       STAT.wages += S.wages(s);
@@ -345,7 +345,7 @@ function run(botName, seed) {
     if (!r.ok) { if (!S.postpone(s).ok) { S.bankrupt(s); return { win: false, week: s.week, level: s.level, cash: s.cash, w1min }; } STAT.postponed++; }
     if (r.won) return { win: true, week: 8, level: s.level, cash: s.cash, w1min };
     if (!NOCARDS && !NOPICK && !bot.lazy) botCard(s, S.offerCards(s, CC.makeRng(s)), CC.makeRng(s), est(s));
-    S.startWeek(s); if (s.weekKlus) STAT.wkOffered++;
+    S.startWeek(s); if (s.weekKlus) { STAT.wkOffered++; STAT.wkBy[s.weekKlus.id] = (STAT.wkBy[s.weekKlus.id] || 0) + 1; if (!S.weekKlusOk || !S.weekKlusOk(s, s.weekKlus)) STAT.wkBad++; }
     if (NOCARDS || NOMISHAP) s.mishap = null;
   }
 }
@@ -354,11 +354,11 @@ console.log(`Balans: ${RUNS} runs per bot · start €${C.startCash} · aflossin
 console.log('bot        winst%  eindkas(med)  niveau(med)  failliet in week (verdeling)');
 const ONLY = process.env.BOTS ? process.env.BOTS.split(',') : Object.keys(BOTS);
 for (const name of ONLY) {
-  STAT = { days: 0, soldOut: 0, sem: 0, fatima: 0, dubois: 0, wages: 0, w1Short: 0, orders: 0, ordersOk: 0, postponed: 0, wkDone: 0, wkOffered: 0, cards: {}, xp: {}, xpd: {}, gain: {}, upg: 0, lvDay: {}, klus: {} };
+  STAT = { days: 0, soldOut: 0, sem: 0, fatima: 0, dubois: 0, wages: 0, w1Short: 0, orders: 0, ordersOk: 0, postponed: 0, wkDone: 0, wkOffered: 0, wkBy: {}, wkDoneBy: {}, wkBad: 0, cards: {}, xp: {}, xpd: {}, gain: {}, upg: 0, lvDay: {}, klus: {} };
   const res = []; for (let i = 0; i < RUNS; i++) res.push(run(name, 1000 + i));
   const wins = res.filter(r => r.win);
   const med = a => { if (!a.length) return '-'; a = a.slice().sort((x, y) => x - y); return Math.round(a[a.length >> 1]); };
   const fails = {}; res.filter(r => !r.win).forEach(r => fails[r.week] = (fails[r.week] || 0) + 1);
   const topCards = Object.entries(STAT.cards).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ');
-  console.log(`${name.padEnd(10)} ${String(Math.round(100 * wins.length / RUNS)).padStart(5)}%  ${String(med(wins.map(r => r.cash))).padStart(12)}  ${String(med(res.map(r => r.level))).padStart(11)}  ${JSON.stringify(fails)}` + (process.env.STATS ? `  · marge/dag €${Math.round(STAT.profit / STAT.days)} · loon/dag €${Math.round(STAT.wages / STAT.days)} · uitverkocht ${(STAT.soldOut / STAT.days).toFixed(1)}/dag · laagste kas wk1 (med) €${med(res.map(r => r.w1min))} · wk1 ingekort ${(STAT.w1Short / RUNS).toFixed(1)} dag · uitstel ${Math.round(100 * STAT.postponed / RUNS)}% · bruiloft ${STAT.ordersOk}/${STAT.orders} · kaarten: ${topCards}` + (Object.keys(STAT.xp).length ? ' · XP/dag ' + Object.keys(STAT.xp).map(k => `${k} ${(STAT.xp[k] / STAT.xpd[k]).toFixed(1)} (+€${Math.round(STAT.gain[k] / STAT.xpd[k])})`).join(', ') : '') + ` · extra klanten investeringen +€${Math.round(STAT.upg / STAT.days)}/dag` + ' · niveau op dag (med) ' + [2, 3, 4, 5, 6, 7, 8].map(L => `${L}:${STAT.lvDay[L] ? med(STAT.lvDay[L]) : '-'}`).join(' ') + ' · klus gehaald ' + [1, 2, 3, 4, 5, 6, 7, 8].map(L => `${L}:${Math.round(100 * (STAT.klus[L] || 0) / RUNS)}%`).join(' ') + ` · weekklus ${STAT.wkDone}/${STAT.wkOffered}` : ''));
+  console.log(`${name.padEnd(10)} ${String(Math.round(100 * wins.length / RUNS)).padStart(5)}%  ${String(med(wins.map(r => r.cash))).padStart(12)}  ${String(med(res.map(r => r.level))).padStart(11)}  ${JSON.stringify(fails)}` + (process.env.STATS ? `  · marge/dag €${Math.round(STAT.profit / STAT.days)} · loon/dag €${Math.round(STAT.wages / STAT.days)} · uitverkocht ${(STAT.soldOut / STAT.days).toFixed(1)}/dag · laagste kas wk1 (med) €${med(res.map(r => r.w1min))} · wk1 ingekort ${(STAT.w1Short / RUNS).toFixed(1)} dag · uitstel ${Math.round(100 * STAT.postponed / RUNS)}% · bruiloft ${STAT.ordersOk}/${STAT.orders} · kaarten: ${topCards}` + (Object.keys(STAT.xp).length ? ' · XP/dag ' + Object.keys(STAT.xp).map(k => `${k} ${(STAT.xp[k] / STAT.xpd[k]).toFixed(1)} (+€${Math.round(STAT.gain[k] / STAT.xpd[k])})`).join(', ') : '') + ` · extra klanten investeringen +€${Math.round(STAT.upg / STAT.days)}/dag` + ' · niveau op dag (med) ' + [2, 3, 4, 5, 6, 7, 8].map(L => `${L}:${STAT.lvDay[L] ? med(STAT.lvDay[L]) : '-'}`).join(' ') + ' · klus gehaald ' + [1, 2, 3, 4, 5, 6, 7, 8].map(L => `${L}:${Math.round(100 * (STAT.klus[L] || 0) / RUNS)}%`).join(' ') + ` · weekklus ${STAT.wkDone}/${STAT.wkOffered} (` + Object.keys(STAT.wkBy).sort().map(k => `${k.slice(3)} ${STAT.wkDoneBy[k] || 0}/${STAT.wkBy[k]}`).join(', ') + `; voorwaarde geschonden ${STAT.wkBad})` : ''));
 }

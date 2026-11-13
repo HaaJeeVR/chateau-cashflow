@@ -77,7 +77,10 @@
     for (const c of FX.flying) {
       c.t += dt;
       const k = Math.min(1, c.t / c.dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;   // in-uit
-      const pos = kk => [c.x0 + (CASH.x - c.x0) * kk, c.y0 + (CASH.y - c.y0) * kk - c.h * Math.sin(kk * Math.PI)];
+      // 12_WEEKKLUSSEN §5: om het uithangbord heen (links eronder langs), zodat het logo vrij blijft (besluit 90)
+      const S = (CC.BG && CC.BG.sign) || { x: 285, y: 49 }, p1x = Math.min(c.x0 - 90, S.x - 50), p1y = c.y0 + 2, p2x = CASH.x + 12, p2y = Math.max(60, S.y + 30);
+      const pos = kk => { const u = 1 - kk, a = u * u * u, b = 3 * u * u * kk, cc = 3 * u * kk * kk, d = kk * kk * kk;
+        return [a * c.x0 + b * p1x + cc * p2x + d * CASH.x, a * c.y0 + b * p1y + cc * p2y + d * CASH.y - 6 * Math.sin(kk * Math.PI)]; };
       if (k >= 1) {   // geland: kas licht op (langer bij een grote verkoop) en een paar vonkjes
         FX.land = { t: c.big ? 0.9 : 0.5, max: c.big ? 0.9 : 0.5, big: c.big };
         FX.sparkle(CASH.x, CASH.y, P.gold2, c.big ? 6 : 3);
@@ -92,7 +95,8 @@
     if (FX.land) { FX.land.t -= dt; if (FX.land.t <= 0) FX.land = null; }
   };
   // De fles die gepakt wordt, komt zichtbaar uit de kast: een spookfles die even omhoog gaat en vervaagt
-  FX.pluck = function (x, y, wine) { FX.parts.push({ x, y, vx: 0, vy: -26, g: 0, life: 0, max: 0.45, ghost: wine }); FX.parts.push({ x: x + 1, y: y - 3, vx: 0, vy: 0, g: 0, life: 0, max: 0.3, flash: true, small: true }); };
+  // 12_WEEKKLUSSEN §5: eerst 3 px omhoog met een gouden plek eronder (een paar beelden), dan pas weg en vervagen
+  FX.pluck = function (x, y, wine) { FX.parts.push({ x, y, vx: 0, vy: 0, g: 0, life: 0, max: 0.55, ghost: wine, lift: true }); };
   // Vak is op: het lege vak knippert één keer rood (rect uit R.vakRects)
   FX.vakFlash = {};
   FX.flashVak = function (vakId) { FX.vakFlash[vakId] = performance.now() / 1000; };
@@ -132,7 +136,13 @@
       next.push(p);
       const x = Math.round(p.x), y = Math.round(p.y);
       ctx.globalAlpha = p.rocket ? 1 : Math.max(0, 1 - k * k);
-      if (p.ghost) { ctx.globalAlpha = Math.max(0, 1 - k); R().bottleP(ctx, x, y, p.ghost); ctx.globalAlpha = 1; continue; }
+      if (p.ghost) {
+        const t = p.life;   // 0–0,12 s: 3 px omhoog en goud; daarna stijgt hij verder en vervaagt
+        const dy = t < 0.12 ? -Math.round(t / 0.12 * 3) : -3 - Math.round((t - 0.12) * 30);
+        if (t < 0.2) { R().rect(ctx, x - 1, y - 13, 6, 14, P.gold2); R().rect(ctx, x, y - 14, 4, 1, P.gold2); }   // de plek licht goud op
+        ctx.globalAlpha = t < 0.12 ? 1 : Math.max(0, 1 - (t - 0.12) / 0.43);
+        R().bottleP(ctx, x, y + dy, p.ghost); ctx.globalAlpha = 1; continue;
+      }
       if (p.flash && p.small) { const r = Math.round(2 + k * 4); ctx.globalAlpha = 0.6 * (1 - k); R().round(ctx, x - r, y - r, r * 2, r * 2, r, P.cream3); ctx.globalAlpha = 1; continue; }
       if (p.flash) { const r = Math.round(6 + k * 10); ctx.globalAlpha = 0.5 * (1 - k); R().round(ctx, x - r, y - r, r * 2, r * 2, r, P.gold2); ctx.globalAlpha = 1; continue; }
       if (p.coin) { R().rect(ctx, x - 1, y - 1, 3, 3, P.ink); R().rect(ctx, x, y - 1, 1, 3, P.gold); R().rect(ctx, x - 1, y, 3, 1, P.gold); R().rect(ctx, x, y, 1, 1, P.gold2); }
