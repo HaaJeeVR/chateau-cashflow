@@ -474,3 +474,10 @@ Beide beelden zijn optioneel: ontbreekt het bestand, dan tekent de code het sche
 | `assets/rolluik.png` | 640 × 343 | Failliet: zakt in 1,25 s van boven (onder de HUD, y 17) over de winkel en veert even na; venster "Failliet" erboven, dus het midden rustig houden | M1 in `claude/08_ART_PAKKET_B.md` |
 | `assets/schuldenvrij.png` | 640 × 360 | Schuldenvrij: vloeit in 0,6 s over de winkel heen als achtergrond; venster met bankier en score erboven, licht gedimd; de HUD blijft bovenaan (bovenste 17 px vallen eronder) | M2 in `claude/08_ART_PAKKET_B.md` |
 
+### Pakket D (2026-11-13, besluit 114–118)
+
+- **Achtergrond:** bronnen vervangen? Oude naar `art_bronnen/_oud_<datum>/`, dan `build_bg.py`, `measure_planks.py` (waarden in `CC.BG.planks`), `build_voorgrond.py`, `build_intro.py`, `build_feest.py`. Trapje/kaars (`VITRINE_PARTS`) en matje (`MAT_DST`) staan in bronpixels in `build_bg.py`.
+- **Actiebeelden personeel:** blad 2 × 2 in `art_bronnen/personages/acties/<sem|fatima|dubois>.png` → `python3 tools/import_acties.py art_bronnen/personages/acties` (na `import_bladen.py`).
+- **Tasje en doos:** `art_bronnen/voorwerpen/draagbaar.png` (drie voorwerpen naast elkaar op magenta) → `python3 tools/build_draagbaar.py` (ook na nieuwe figuren: meet de handen opnieuw).
+- **Doos open:** `art_bronnen/kaarten/doos_open.png` → `python3 tools/build_cards.py`.
+
