@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-11-13 — Pakket B, vervolg (branch `pakket-b`, bouwt op `nieuwe-achtergrond`)
+
+| # | Besluit | Reden |
+|---|---|---|
+| 119 | **Niveau 5–8 trager, variant "licht" (B2, keuze HJ).** Drempels 0 · 28 · 80 · 155 · **300 · 470 · 690 · 950** (was 245 · 355 · 490 · 650; 2–4 ongewijzigd). Bots, 150 runs, voor → na: alles 86 → 68 · advies 68 → 13 · slim 50 → 5 · perfect 81 → 28 · mix 13 → 0. Niveau 8 (mediaan): alles dag 25 → 33, advies 29 → 41, perfect 27 → 39. Variant "stevig" (… 330 · 560 · 850 · 1200): alles 39, de rest 0. Let op: alles komt op dag 33, iets vóór het doel van 36–40; de zwakkere bots verliezen nu bijna altijd. Geen andere getallen bijgesteld (handoff B2); B5 (leningen) stelt de termijnen straks af. | Handoff na review 2: de tweede helft van de run moet nog iets te halen hebben. |
+
+---
+
 ## 2026-11-13 — Pakket D: nieuwe achtergrond en beelden (branch `nieuwe-achtergrond`, wacht op review Fable)
 
 | # | Besluit | Reden |

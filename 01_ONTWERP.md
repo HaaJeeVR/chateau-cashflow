@@ -295,12 +295,12 @@ Elk niveau geeft **twee nieuwe dingen** onder één thema (even groot getoond, g
 | 2 | 28 | Een stagiair | Sem kan komen werken | Crémant de Loire | 12 flessen Crémant (+15) |
 | 3 | 80 | De kenners | Liefhebbers + Gewurztraminer | Vitrine te koop | 15 flessen aan liefhebbers (+20) |
 | 4 | 155 | Meer ruimte | Derde kast te koop | Chablis | Op één dag 6 verschillende wijnen (+25) |
-| 5 | 245 | Verkooptalent | Fatima kan komen werken | Wijnkoeling te koop | Fatima haalt 6 klanten terug (+30) |
-| 6 | 355 | De kelder | Bordeaux + Port | Uithangbord te koop | 15 flessen Bordeaux of Port (+35) |
-| 7 | 490 | Status | Statuszoekers + Barolo | Meneer Dubois | 8 flessen aan statuszoekers (+40) |
-| 8 | 650 | Topklasse | Champagne + vierde kast te koop | Gevrey-Chambertin | 6 flessen Champagne (€150) |
+| 5 | 300 | Verkooptalent | Fatima kan komen werken | Wijnkoeling te koop | Fatima haalt 6 klanten terug (+30) |
+| 6 | 470 | De kelder | Bordeaux + Port | Uithangbord te koop | 15 flessen Bordeaux of Port (+35) |
+| 7 | 690 | Status | Statuszoekers + Barolo | Meneer Dubois | 8 flessen aan statuszoekers (+40) |
+| 8 | 950 | Topklasse | Champagne + vierde kast te koop | Gevrey-Chambertin | 6 flessen Champagne (€150) |
 
-Winkelfases blijven op niveau 3 en 6 (decor). **Klussen** blijven open tot je ze haalt; er kunnen er meer tegelijk lopen. Ze staan linksboven onder "Vandaag verwacht" met een voortgangsbalk; een gehaalde klus staat met een vinkje in het dagrapport. Een goede speler bereikt niveau 8 rond dag 25 (week 5).
+Winkelfases blijven op niveau 3 en 6 (decor). **Klussen** blijven open tot je ze haalt; er kunnen er meer tegelijk lopen. Ze staan linksboven onder "Vandaag verwacht" met een voortgangsbalk; een gehaalde klus staat met een vinkje in het dagrapport. Niveau 5–8 zijn trager sinds B2 (besluit 119): de "alles"-bot bereikt niveau 8 rond dag 33 (week 6), een gemiddelde speler rond dag 40.
 
 ---
 

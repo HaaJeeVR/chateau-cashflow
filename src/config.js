@@ -88,7 +88,7 @@
     duboisBudget: [1.25, 1.3, 1.4, 1.5, 1.6],  // Dubois: kenners geven bij hem zoveel × hun budget uit (besluit 72)
 
     // Reputatie en niveaus (01_ONTWERP §8)
-    levelRep: [0, 28, 80, 155, 245, 355, 490, 650],      // drempel per niveau 1–8 (besluit 76: iets sneller, want minder per niveau + klussen)
+    levelRep: [0, 28, 80, 155, 300, 470, 690, 950],      // drempel per niveau 1–8 (B2 "licht", besluit 119: 5–8 trager; was 245, 355, 490, 650)
     repPerSale: 1, repPrestigeBonus: 1, repWoeker: -2,
   };
 
