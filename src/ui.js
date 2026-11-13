@@ -156,12 +156,16 @@
     R().rect(ctx, 116, 4, 7, 7, P.ink); R().rect(ctx, 117, 4, 5, 7, P.gold); R().rect(ctx, 116, 5, 7, 5, P.gold); R().rect(ctx, 118, 6, 3, 3, '#b88a2a');
     // kas telt op of af naar het echte bedrag, kort groen (erbij) of rood (eraf) (M7-juice)
     const now = app.t || 0, dtc = Math.min(0.1, Math.max(0, now - (app.cashT || now))); app.cashT = now;
-    if (app.cashShown == null || app.cashShownS !== s) { app.cashShown = s.cash; app.cashShownS = s; }
-    const diff = s.cash - app.cashShown;
-    if (Math.abs(diff) > 0.01) { app.cashFlash = { up: diff > 0, t: 0.45 }; app.cashShown += diff * Math.min(1, dtc * 7) + Math.sign(diff) * Math.min(Math.abs(diff), dtc * 20); if (Math.abs(s.cash - app.cashShown) < 0.5) app.cashShown = s.cash; }
+    // A10: geld dat nog als munt onderweg is naar de kas, telt pas mee als het landt
+    const FXc = CC.FX, target = s.cash - (app.phase === 'sale' && FXc ? FXc.cashPending() : 0);
+    if (app.cashShown == null || app.cashShownS !== s) { app.cashShown = target; app.cashShownS = s; }
+    const diff = target - app.cashShown;
+    if (Math.abs(diff) > 0.01) { if (!(diff > 0 && FXc && FXc.land)) app.cashFlash = { up: diff > 0, t: 0.45 }; app.cashShown += diff * Math.min(1, dtc * 7) + Math.sign(diff) * Math.min(Math.abs(diff), dtc * 20); if (Math.abs(target - app.cashShown) < 0.5) app.cashShown = target; }
     if (app.cashFlash) { app.cashFlash.t -= dtc; if (app.cashFlash.t <= 0) app.cashFlash = null; }
-    const shown = Math.abs(s.cash - app.cashShown) < 0.01 ? s.cash : Math.round(app.cashShown);
-    const cashCol = app.cashFlash ? (app.cashFlash.up ? P.green4 : P.red) : (s.cash < 0 ? P.red : P.gold2);
+    const shown = Math.abs(target - app.cashShown) < 0.01 ? target : Math.round(app.cashShown);
+    const land = FXc && FXc.land;   // munt geland: kort goud oplichten (langer bij een grote verkoop)
+    if (land) { const k = land.t / land.max, gw = F().width(R().euro(shown)) + 18; ctx.globalAlpha = 0.75 * k; R().round(ctx, 113, 2, gw, 12, 4, P.gold); ctx.globalAlpha = 1; R().rect(ctx, 116, 4, 7, 7, P.ink); R().rect(ctx, 117, 4, 5, 7, P.gold); R().rect(ctx, 116, 5, 7, 5, P.gold); R().rect(ctx, 118, 6, 3, 3, '#b88a2a'); }
+    const cashCol = land ? P.cream3 : app.cashFlash ? (app.cashFlash.up ? P.green4 : P.red) : (s.cash < 0 ? P.red : P.gold2);
     F().draw(ctx, R().euro(shown), 127, 4, cashCol);
     // aflossing (zondag), besluit 89: "Zondag €720" en een balk die iets zegt. Beschikbaar = kas min de huur en
     // lonen die deze week nog van de kas gaan (SIM.costsLeft), tegenover de termijn. Groen = gedekt, goud = krap
@@ -1480,12 +1484,55 @@
       UI.btn(app, ctx, 'newweek', 320 - 80, y0 + CH + 12, 160, 20, `Zonder kaart naar week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
     }
     if (s.postponed && s.status === 'playing' && t > 1.2) UI.restartBtn(app, ctx, 640 - 124, 334, 116, 18);   // A8: rechtsonder, uit de weg
+    if (sun.chosen === 'doos' && s.card && s.card.box && ct > 1.1) { UI.boxReveal(app, ctx, ct - 1.1); return; }   // A10
     if (sun.chosen && ct > 1.1) {
       const T = CC.TEXT.cards[sun.chosen];
       HF().draw(ctx, T.title, 320, 152, P.gold2, { align: 'center', shadow: P.ink });
       if (sun.cardMsg) F().draw(ctx, sun.cardMsg, 320, 176, P.cream2, { align: 'center', shadow: P.ink });
       UI.btn(app, ctx, 'newweek', 320 - 65, 200, 130, 20, `Week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
     }
+  };
+  // A10: doos zonder etiket op zondag: de doos valt neer, de flappen gaan open, een fles komt omhoog en de naam verschijnt
+  UI.boxReveal = function (app, ctx, rt) {
+    const s = app.s, sun = app.sunday, w = CC.wineById(s.card.box), T = CC.TEXT.cards.doos;
+    const ease = k => 1 - Math.pow(1 - Math.max(0, Math.min(1, k)), 3);
+    const fade = Math.min(1, rt / 0.2);
+    ctx.globalAlpha = 0.6 * fade; R().round(ctx, 170, 52, 300, 238, 12, P.ink); ctx.globalAlpha = 1;   // rustige achtergrond voor het moment
+    HF().draw(ctx, T.title, 320, 66, P.gold2, { align: 'center', shadow: P.ink });
+    const cx = 320, BW = 70, BH = 36, land = 162;
+    const drop = ease(rt / 0.28), bounce = rt > 0.28 && rt < 0.42 ? -Math.round(3 * Math.sin((rt - 0.28) / 0.14 * Math.PI)) : 0;
+    const by = Math.round(land - 40 * (1 - drop)) + bounce, bx = cx - BW / 2;
+    R().round(ctx, bx + 2, land + BH - 2, BW, 5, 2, 'rgba(31,10,14,0.45)');   // schaduw
+    // binnenkant en achterflap
+    R().rect(ctx, bx, by, BW, 6, P.ink); R().rect(ctx, bx + 1, by + 1, BW - 2, 5, '#3a2012');
+    // fles komt omhoog uit de doos
+    const up = ease((rt - 0.62) / 0.45), bottleY = Math.round(by + 52 - up * 42);   // onderkant van de fles; eindigt met de voet in de doos
+    if (rt > 0.6) {
+      ctx.save(); ctx.beginPath(); ctx.rect(bx, 0, BW, by + BH - 2); ctx.clip();
+      if (!R().wineSprite(ctx, w, 'groot', cx, bottleY)) R().bottleMid(ctx, cx, bottleY - 20, w);
+      ctx.restore();
+    }
+    // voorkant van de doos (dekt de onderkant van de fles af)
+    R().rect(ctx, bx, by + 6, BW, BH - 6, P.ink); R().rect(ctx, bx + 1, by + 6, BW - 2, BH - 7, P.wood3);
+    R().rect(ctx, bx + 1, by + 6, BW - 2, 2, P.wood4); R().rect(ctx, bx + 1, by + BH - 3, BW - 2, 1, P.wood2);
+    R().rect(ctx, cx - 9, by + 15, 18, 11, P.cream1); R().rect(ctx, cx - 8, by + 16, 16, 9, P.cream3);
+    HF().draw(ctx, '?', cx, by + 15, rt > 1.1 ? P.stone1 : P.ink, { align: 'center' });
+    // flappen: dicht liggen ze plat naar binnen, open staan ze schuin naar buiten (scharnier op de bovenhoek)
+    const th = ease((rt - 0.36) / 0.25) * 2.45, fl = 28;
+    for (const side of [-1, 1]) {
+      const hx = side < 0 ? bx + 1 : bx + BW - 3, dx = -side;
+      const pts = []; for (let i = 0; i <= fl; i++) pts.push([Math.round(hx + dx * i * Math.cos(th)), Math.round(by - i * Math.sin(th))]);
+      for (const [x, y] of pts) R().rect(ctx, x - 1, y - 1, 4, 4, P.ink);   // eerst de omlijning, dan het karton
+      pts.forEach(([x, y], i) => R().rect(ctx, x, y, 2, 2, i > fl - 3 ? P.wood2 : P.wood4));
+    }
+    if (rt > 1.1 && !sun.boxSparkled) { sun.boxSparkled = true; if (CC.FX) CC.FX.sparkle(cx, bottleY - 40, P.gold2, 8); }
+    if (rt > 1.1) {
+      const a = Math.min(1, (rt - 1.1) / 0.25); ctx.globalAlpha = a;
+      HF().draw(ctx, w.name, cx, land + BH + 12, P.cream3, { align: 'center', shadow: P.ink });
+      if (sun.cardMsg) F().draw(ctx, sun.cardMsg, cx, land + BH + 30, P.cream2, { align: 'center', shadow: P.ink });
+      ctx.globalAlpha = 1;
+    }
+    if (rt > 1.4) UI.btn(app, ctx, 'newweek', cx - 65, land + BH + 46, 130, 20, `Week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
   };
   // Tegenvaller: verschijnt op maandag bij het voorbereiden, met twee keuzes
   UI.mishapPanel = function (app, ctx) {

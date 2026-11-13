@@ -199,6 +199,7 @@
               const reason = dec.reason;
               if (reason === 'soldOut') {
                 const w = CC.wineById(dec.wineId);
+                if (d.visual && CC.FX) { const v = SIM().vakOfWine(s, dec.wineId); if (v) CC.FX.flashVak(v); }   // A10
                 say(c, CC.pickText(T.soldOut, d.rng, { wine: w.name }), 'bord', 2.8);
               } else if (reason === 'tooExpensive') say(c, CC.pickText(T.tooExpensive, d.rng), 'red', 2.6);
               else say(c, CC.pickText(T.nothing, d.rng), 'grey', 2.6);
@@ -214,9 +215,16 @@
           c.moving = false;
           c.timer -= dt;
           if (c.timer <= 0) {
+            // A10: welke flessen gaan er uit welk vak? (voor de spookfles die zichtbaar uit de kast komt)
+            const before = d.visual && CC.FX ? SIM().activeVakIds(s).filter(v => s.vakken[v].wine === c.want.wineId).map(v => [v, s.vakken[v].n]) : [];
             const got = SIM().take(s, c.want.wineId, c.want.qty);
+            for (const [v, n0] of before) {
+              const n1 = s.vakken[v].n, pos = n1 < n0 && CC.R.vakBottlePos(v);
+              if (pos) for (let i = n1; i < n0; i++) { const [bx, by] = pos(i); CC.FX.pluck(bx, by, CC.wineById(c.want.wineId)); }
+            }
             if (got <= 0) {
               const w = CC.wineById(c.want.wineId);
+              if (d.visual && CC.FX) { const v = SIM().vakOfWine(s, c.want.wineId); if (v) CC.FX.flashVak(v); }
               say(c, CC.pickText(T.soldOut, d.rng, { wine: w.name }), 'bord', 2.8);
               SIM().recordLeave(d.log, 'soldOut', c.want.wineId, c.type);
               leave(c);
@@ -253,7 +261,11 @@
           c.timer -= dt;
           if (c.timer <= 0) {
             const rev = SIM().paySale(s, d.log, c.want.wineId, c.want.qty, c.want.price, c.type, c.src);
-            if (CC.FX && d.visual) { const rg = CC.BG && CC.BG.register; if (rg) CC.FX.coins(rg.x + rg.w / 2, rg.y + 4); else { const [sx, sy] = CC.R.iso(RM.counter.x, RM.counter.y); CC.FX.coins(sx + 18, sy - 30); } }
+            if (CC.FX && d.visual) {
+              const rg = CC.BG && CC.BG.register, [sx, sy] = rg ? [rg.x + rg.w / 2, rg.y + 4] : ((p => [p[0] + 18, p[1] - 30])(CC.R.iso(RM.counter.x, RM.counter.y)));
+              CC.FX.coins(sx, sy);
+              CC.FX.saleCoin(rev, c.want.qty, sx, sy - 2);   // A10: munt vliegt naar de kas in de HUD
+            }
             // bedrag boven de kassa (M7-juice): gouden label dat opstijgt; tegelijke verkopen stapelen
             const stack = d.floats.filter(f => f.cash && f.t > 1.0).length;
             // reputatie (besluit 76) staat in hetzelfde label: "+€13  +1 ★" (los boven de klant botste het met het bedrag)

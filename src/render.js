@@ -650,6 +650,14 @@
     ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(x, y - 7, 1, 2);
   };
 
+  // A10: schermpositie van fles nummer idx (0 = eerste) in een vak, zoals paintedShelf hem tekent
+  R.vakBottlePos = function (vakId) {
+    const BG = CC.BG; if (!BG || !BG.planks) return null;
+    const f = CC.FURNITURE.find(ff => ff.vakken && ff.vakken.includes(vakId)); if (!f) return null;
+    const pk = BG.planks[f.id]; if (!pk) return null;
+    const vi = f.vakken.indexOf(vakId), rows = pk.rows.slice(vi * 2, vi * 2 + 2), per = 6, span = pk.x1 - pk.x0 - 3;
+    return idx => { const r = Math.min(1, Math.floor(idx / per)), i = idx % per, x = Math.round(pk.x0 + 1 + i * span / per); return [x, Math.round(rows[r] + pk.slope * (x + 1))]; };
+  };
   R.paintedShelf = function (ctx, f, s, hover, images) {
     const BG = CC.BG, L = CC.BG_LAYERS || {};
     R.drawLayer(ctx, images, 'layer_' + f.id, L[f.id]);
@@ -680,7 +688,9 @@
         R.rect(ctx, pk.x0 - 2, Y(rows[0], pk.x0 - 2) - 13, 1, Y(rows[1], pk.x0 - 2) - Y(rows[0], pk.x0 - 2) + 14, P.gold2);
         R.rect(ctx, pk.x1 + 1, Y(rows[0], pk.x1 + 1) - 13, 1, Y(rows[1], pk.x1 + 1) - Y(rows[0], pk.x1 + 1) + 14, P.gold2);
       }
-      rects.push({ vak: vakId, x: pk.x0 - 3, y: top, w: pk.x1 - pk.x0 + 6, h: bot - top });
+      const rect = { vak: vakId, x: pk.x0 - 3, y: top, w: pk.x1 - pk.x0 + 6, h: bot - top };
+      rects.push(rect);
+      if (CC.FX && CC.FX.drawVakFlash) CC.FX.drawVakFlash(ctx, vakId, rect);   // A10: vak op → knippert één keer rood
     });
     return rects;
   };

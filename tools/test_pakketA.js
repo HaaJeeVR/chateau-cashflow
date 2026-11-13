@@ -210,6 +210,29 @@ const server = http.createServer((req, res) => {
   check('Ja: nieuw spel in week 1, oude als reservekopie', (await ev(() => app.s.week === 1 && app.phase === 'prep' && CC.hasBackup() && CC.backupInfo().week === 3)));
   await ev(() => { while (app.notice) app.closeNotice(); });
 
+  // ---------- A10: het moment van verkopen, in beeld ----------
+  console.log('A10: munt naar de kas, fles uit de kast, drukte, doos');
+  await ev(() => {
+    app.newGame(); const s = app.s; s.flags.introSeen = true; s.flags.opened = true; s.level = 8; s.rep = 900; s.cash = 3000; s.mishap = null; app.rebuildRoom();
+    CC.SIM.activeVakIds(s).forEach((v, i) => { const w = CC.SIM.unlockedWines(s)[i]; if (w) { CC.SIM.buy(s, w.id, 12); CC.SIM.assignVak(s, v, w.id); } });
+    app.startPrep(); while (app.notice) app.closeNotice(); app.openShop(); app.day.speed = 4; app.speed = 4;
+  });
+  let seen = { coin: false, lag: false, ghost: false, maxFly: 0 };
+  for (let i = 0; i < 160; i++) {
+    const r = await ev(() => ({ fly: CC.FX.flying.length, pend: CC.FX.cashPending(), lag: app.cashShown < app.s.cash - 0.5, ghost: CC.FX.parts.some(p => p.ghost) }));
+    if (r.fly) seen.coin = true; if (r.pend > 0 && r.lag) seen.lag = true; if (r.ghost) seen.ghost = true; seen.maxFly = Math.max(seen.maxFly, r.fly);
+    await wait(50);
+  }
+  check('verkoop: munt vliegt naar de kas, kas telt pas op als hij landt', seen.coin && seen.lag, JSON.stringify(seen));
+  check('fles komt zichtbaar uit de kast bij het pakken', seen.ghost);
+  check('4×, niveau 8: hooguit 5 munten tegelijk', seen.maxFly >= 1 && seen.maxFly <= 5, String(seen.maxFly));
+  await ev(() => app.skipDay()); await frames(4);
+  check('na de dag: geen munten meer onderweg', (await ev(() => CC.FX.flying.length === 0 && CC.FX.cashPending() === 0)));
+  await ev(() => { app.newGame(); const s = app.s; s.flags.introSeen = true; s.level = 2; s.cash = 800; s.day = 6; s.mishap = null; app.openSunday(); app.ring = null; app.bankPay(); app.sunday.cards = ['doos', 'hittegolf']; app.chooseCard('doos'); });
+  await wait(3000);
+  check('doos: onthulling met de wijn en daarna "Week 2"', (await ev(() => !!app.s.card.box)) && !!(await hit('newweek')));
+  await shot('A10-doos');
+
   // ---------- A9: telefoon liggend en staand, delen ----------
   console.log('A9: touch op 844 x 390, staand scherm, favicon en deelvoorbeeld');
   {

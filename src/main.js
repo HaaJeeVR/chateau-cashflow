@@ -799,6 +799,7 @@
     }
     if (app.phase !== 'title') UI.confirmNewPanel(app, ctx);   // A8: Opnieuw beginnen (zondag na uitstel)
     if (CC.FX) CC.FX.drawParts(ctx, dt);   // deeltjes boven alles (muntjes, deurbel, vuurwerk)
+    if (CC.FX) { if (app.phase === 'sale') CC.FX.drawCoins(ctx, dt); else if (CC.FX.flying.length) CC.FX.clearCoins(); }   // A10: munten naar de kas
     if (app.dialog) UI.textDialog(app, ctx);
     DBG.draw(app, ctx);
     const h = app.touchInput ? UI.pickTouch(app.mouse.x, app.mouse.y, app.touchMin()) : UI.pick(app.mouse.x, app.mouse.y);

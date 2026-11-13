@@ -50,6 +50,60 @@
   FX.coins = function (sx, sy) {
     for (let i = 0; i < 4; i++) FX.parts.push({ x: sx + (Math.random() - 0.5) * 6, y: sy, vx: (Math.random() - 0.5) * 30, vy: -40 - Math.random() * 25, g: 140, life: 0, max: 0.6 + Math.random() * 0.2, col: P.gold, coin: true });
   };
+  // ---------- A10: het moment van verkopen, in beeld ----------
+  // Bij elke verkoop vliegt een munt (het HUD-icoon) in een boog van de kassa naar het kasbedrag; pas als hij landt
+  // telt de kas op (FX.cashPending wordt van de getoonde kas afgetrokken). Grote verkoop (> €25 of 6+ flessen):
+  // grotere munt met twee kleine erachter en langer oplichten. Druk: hooguit MAXC munten tegelijk; de rest gaat in de
+  // jongste munt die nog vliegt (die groeit mee). Alleen beeld; de sim weet hier niets van.
+  const CASH = { x: 119, y: 7 }, MAXC = 5;
+  FX.flying = []; FX.land = null;
+  FX.cashPending = function () { let a = 0; for (const c of FX.flying) a += c.amt; return a; };
+  FX.clearCoins = function () { FX.flying = []; };
+  FX.saleCoin = function (amt, qty, sx, sy) {
+    const big = amt > 25 || qty >= 6;
+    if (FX.flying.length >= MAXC) {   // bundelen: bij de jongste munt optellen, die wordt groter
+      const c = FX.flying[FX.flying.length - 1]; c.amt += amt; c.n++; c.big = c.big || big || c.n >= 3; return;
+    }
+    FX.flying.push({ x0: sx, y0: sy, t: 0, dur: 0.62 + Math.random() * 0.08, h: 34 + Math.random() * 10, amt, n: 1, big });
+  };
+  function coinAt(ctx, x, y, r) {   // munt zoals het kasicoon in de HUD (7 × 7), kleiner of groter
+    if (r >= 4) { R().round(ctx, x - 4, y - 4, 9, 9, 3, P.ink); R().round(ctx, x - 3, y - 3, 7, 7, 3, P.gold); R().rect(ctx, x - 1, y - 1, 3, 3, '#b88a2a'); R().rect(ctx, x - 2, y - 2, 1, 1, P.gold2); R().rect(ctx, x - 1, y - 3, 2, 1, P.gold2); }
+    else if (r >= 3) { R().rect(ctx, x - 3, y - 3, 7, 7, P.ink); R().rect(ctx, x - 2, y - 3, 5, 7, P.gold); R().rect(ctx, x - 3, y - 2, 7, 5, P.gold); R().rect(ctx, x - 1, y - 1, 3, 3, '#b88a2a'); R().rect(ctx, x - 2, y - 2, 1, 1, P.gold2); }
+    else if (r === 2) { R().rect(ctx, x - 2, y - 2, 5, 5, P.ink); R().rect(ctx, x - 1, y - 2, 3, 5, P.gold); R().rect(ctx, x - 2, y - 1, 5, 3, P.gold); R().rect(ctx, x, y, 1, 1, '#b88a2a'); R().rect(ctx, x - 1, y - 1, 1, 1, P.gold2); }
+    else { R().rect(ctx, x - 1, y - 1, 3, 3, P.ink); R().rect(ctx, x, y - 1, 1, 3, P.gold); R().rect(ctx, x - 1, y, 3, 1, P.gold); R().rect(ctx, x, y, 1, 1, P.gold2); }
+  }
+  FX.drawCoins = function (ctx, dt) {
+    const next = [];
+    for (const c of FX.flying) {
+      c.t += dt;
+      const k = Math.min(1, c.t / c.dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;   // in-uit
+      const pos = kk => [c.x0 + (CASH.x - c.x0) * kk, c.y0 + (CASH.y - c.y0) * kk - c.h * Math.sin(kk * Math.PI)];
+      if (k >= 1) {   // geland: kas licht op (langer bij een grote verkoop) en een paar vonkjes
+        FX.land = { t: c.big ? 0.9 : 0.5, max: c.big ? 0.9 : 0.5, big: c.big };
+        FX.sparkle(CASH.x, CASH.y, P.gold2, c.big ? 6 : 3);
+        continue;
+      }
+      next.push(c);
+      const r = c.big ? 4 : 3;   // gewone verkoop: het HUD-icoon (7 × 7); groot: 9 × 9 met twee kleine munten erachter
+      if (c.big) for (const lag of [0.09, 0.17]) { const kk = Math.max(0, e - lag); if (kk > 0) { const [tx, ty] = pos(kk); coinAt(ctx, Math.round(tx), Math.round(ty), 2); } }
+      const [x, y] = pos(e); coinAt(ctx, Math.round(x), Math.round(y), r);
+    }
+    FX.flying = next;
+    if (FX.land) { FX.land.t -= dt; if (FX.land.t <= 0) FX.land = null; }
+  };
+  // De fles die gepakt wordt, komt zichtbaar uit de kast: een spookfles die even omhoog gaat en vervaagt
+  FX.pluck = function (x, y, wine) { FX.parts.push({ x, y, vx: 0, vy: -26, g: 0, life: 0, max: 0.45, ghost: wine }); FX.parts.push({ x: x + 1, y: y - 3, vx: 0, vy: 0, g: 0, life: 0, max: 0.3, flash: true, small: true }); };
+  // Vak is op: het lege vak knippert één keer rood (rect uit R.vakRects)
+  FX.vakFlash = {};
+  FX.flashVak = function (vakId) { FX.vakFlash[vakId] = performance.now() / 1000; };
+  FX.drawVakFlash = function (ctx, vakId, r) {   // vanuit R.paintedShelf, direct na de flessen van dat vak (juiste diepte)
+    const t0 = FX.vakFlash[vakId]; if (t0 == null) return;
+    const k = (performance.now() / 1000 - t0) / 0.5;
+    if (k >= 1) { delete FX.vakFlash[vakId]; return; }
+    ctx.globalAlpha = 0.5 * Math.sin(k * Math.PI);
+    R().round(ctx, r.x, r.y, r.w, r.h, 2, P.red);
+    ctx.globalAlpha = 1;
+  };
   // Vuurwerk: een pijl die opstijgt en uiteenspat in een kring van vonken
   FX.firework = function (sx, sy, col) {
     FX.parts.push({ x: sx, y: sy + 60, vx: 0, vy: -140, g: 60, life: 0, max: 0.42, col: P.gold2, rocket: true, burst: col || P.gold });
@@ -78,6 +132,8 @@
       next.push(p);
       const x = Math.round(p.x), y = Math.round(p.y);
       ctx.globalAlpha = p.rocket ? 1 : Math.max(0, 1 - k * k);
+      if (p.ghost) { ctx.globalAlpha = Math.max(0, 1 - k); R().bottleP(ctx, x, y, p.ghost); ctx.globalAlpha = 1; continue; }
+      if (p.flash && p.small) { const r = Math.round(2 + k * 4); ctx.globalAlpha = 0.6 * (1 - k); R().round(ctx, x - r, y - r, r * 2, r * 2, r, P.cream3); ctx.globalAlpha = 1; continue; }
       if (p.flash) { const r = Math.round(6 + k * 10); ctx.globalAlpha = 0.5 * (1 - k); R().round(ctx, x - r, y - r, r * 2, r * 2, r, P.gold2); ctx.globalAlpha = 1; continue; }
       if (p.coin) { R().rect(ctx, x - 1, y - 1, 3, 3, P.ink); R().rect(ctx, x, y - 1, 1, 3, P.gold); R().rect(ctx, x - 1, y, 3, 1, P.gold); R().rect(ctx, x, y, 1, 1, P.gold2); }
       else if (p.star) { R().rect(ctx, x, y - 2, 1, 5, p.col); R().rect(ctx, x - 2, y, 5, 1, p.col); R().rect(ctx, x, y, 1, 1, '#ffffff'); }
