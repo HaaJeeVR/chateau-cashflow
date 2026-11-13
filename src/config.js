@@ -333,17 +333,19 @@
       decor_stoepbord: 'assets/layer_decor_stoepbord.png', decor_terras: 'assets/layer_decor_terras.png' },
     // plankniveaus per kast: y = c + slope * x (tools/measure_planks.py); vak A = rij 0–1, vak B = rij 2–3
     planks: {
-      shelf_1: { slope: 0.5, x0: 383, x1: 410, rows: [-84, -66, -48, -30] },
-      shelf_2: { slope: -0.5, x0: 229, x1: 255, rows: [236, 254, 272, 290] },
-      shelf_3: { slope: 0.5, x0: 425, x1: 452, rows: [-84, -66, -48, -30] },
-      shelf_4: { slope: -0.5, x0: 188, x1: 213, rows: [236, 254, 272, 290] },
+      // D1 (nieuwe achtergrond 2026-11-13): opnieuw gemeten; oud: shelf_1 383–410 [-84,-66,-48,-30], shelf_2 229–255 [236,254,272,290],
+      // shelf_3 425–452 [-84,-66,-48,-30], shelf_4 188–213 [236,254,272,290]
+      shelf_1: { slope: 0.5, x0: 381, x1: 410, rows: [-80, -62, -42, -24] },
+      shelf_2: { slope: -0.5, x0: 228, x1: 255, rows: [239, 258, 277, 296] },
+      shelf_3: { slope: 0.5, x0: 424, x1: 452, rows: [-82, -64, -44, -24] },
+      shelf_4: { slope: -0.5, x0: 186, x1: 213, rows: [237, 256, 275, 294] },
     },
     phone: { x: 284, y: 116, w: 26, h: 22 },
     register: { x: 326, y: 108, w: 30, h: 32 },
     counterOutline: { x: 276, y: 128, w: 90, h: 44 },
     tableTop: { cx: 324, cy: 205 },
     // Vitrine (besluit 62): houten trapje op de tafel, gemeten in bg_start.png. Voetpunten van de flessen per trede.
-    vitrine: { top: [[323, 186], [331, 188], [339, 190]], low: [[311, 198], [319, 200], [327, 202]], flame: { x: 353, y: 180 } },
+    vitrine: { top: [[319, 192], [327, 194], [335, 196]], low: [[307, 204], [315, 206], [323, 208]], flame: { x: 348, y: 183 } },   // D1: trapje (-4,+6), kaars (-5,+3) t.o.v. de oude achtergrond
     sign: { x: 285, y: 49 },
   };
 

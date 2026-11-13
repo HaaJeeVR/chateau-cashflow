@@ -38,9 +38,9 @@ def load(p):
 SRC_VITRINE = os.path.join(ROOT, 'art_bronnen', 'bg_vitrine_bron.png')
 _T = lambda pts: [(765 + x / 5, 460 + y / 5) for x, y in pts]
 VITRINE_PARTS = [
-    (_T([(145, 122), (272, 64), (606, 212), (590, 300), (620, 360), (620, 460), (412, 548), (385, 545), (380, 500), (75, 405), (55, 390), (52, 288), (150, 245)]), (18, -12)),   # trapje
+    (_T([(145, 122), (272, 64), (606, 212), (590, 300), (620, 360), (620, 460), (412, 548), (385, 545), (380, 500), (75, 405), (55, 390), (52, 288), (150, 245)]), (8, 4)),   # trapje (D1: was (18, -12); de nieuwe tafel is minder diep)
     (_T([(765, 70), (780, 70), (790, 150), (815, 190), (815, 320), (845, 335), (835, 360), (810, 380), (815, 500), (855, 530), (855, 560), (800, 595), (720, 590),
-         (680, 555), (685, 520), (735, 495), (735, 375), (705, 345), (710, 325), (735, 315), (735, 195), (755, 150)]), (4, -12)),   # kaars
+         (680, 555), (685, 520), (735, 495), (735, 375), (705, 345), (710, 325), (735, 315), (735, 195), (755, 150)]), (-8, -4)),   # kaars (D1: was (4, -12))
 ]
 
 # Deurmat (2026-09-28): het chique matje (bordeaux, gouden rand, lelie) uit bg_matje_bron.png, een
@@ -48,9 +48,9 @@ VITRINE_PARTS = [
 # affien op het oude matje in bg_start_bron.png gelegd; +MAT_DIK bronpixels onder de mat voor de dikte.
 SRC_MAT = os.path.join(ROOT, 'art_bronnen', 'bg_matje_bron.png')
 MAT_SRC = [(833.75, 715.75), (918, 672.5), (973.75, 701.25), (887.5, 742.5)]   # L, T, R, B in bg_matje_bron.png
-MAT_DST = [(903.75, 780.5), (999.5, 731.25), (1057.5, 768.75), (965, 812.5)]   # L, T, R, B in bg_start_bron.png
+MAT_DST = [(896, 785), (1000, 729), (1070, 767), (960, 818)]   # L, T, R, B in bg_start_bron.png (D1: op het matje van de nieuwe achtergrond; was (903.75, 780.5), (999.5, 731.25), (1057.5, 768.75), (965, 812.5))
 MAT_DIK = 3
-MAT_FLOOR_SHIFT = (-130, 63)   # vloer om het oude matje mee te bedekken: zoveel bronpixels langs de planken verschoven
+MAT_FLOOR_SHIFT = None   # D1: het nieuwe matje valt precies over het geschilderde, dus niets weg te werken. Was (-130, 63): vloer om het oude matje mee te bedekken: zoveel bronpixels langs de planken verschoven
 
 def paste_mat(base):
     if not os.path.exists(SRC_MAT): return base
@@ -59,13 +59,14 @@ def paste_mat(base):
     cx = np.linalg.solve(A, [p[0] for p in MAT_SRC[:3]]); cy = np.linalg.solve(A, [p[1] for p in MAT_SRC[:3]])
     warped = mat.transform(base.size, Image.AFFINE, (*cx, *cy), resample=Image.BICUBIC)
     L, T, R, B = MAT_DST; d = MAT_DIK * 1.2
-    # eerst het oude matje wegwerken: vloer van verderop langs de planken (zelfde afstand tot de vloerrand)
-    old = Image.new('L', base.size, 0)
-    Ro = (R[0] + 5, R[1])   # het oude matje steekt rechts iets verder uit dan het nieuwe
-    ImageDraw.Draw(old).polygon([L, T, Ro, (Ro[0], Ro[1] + d), (B[0], B[1] + d), (L[0], L[1] + d)], fill=255)
-    old = old.filter(ImageFilter.MaxFilter(9))
-    floor = Image.new('RGB', base.size); floor.paste(base, MAT_FLOOR_SHIFT)
-    base = Image.composite(floor, base, old)
+    if MAT_FLOOR_SHIFT is not None:
+        # eerst het oude matje wegwerken: vloer van verderop langs de planken (zelfde afstand tot de vloerrand)
+        old = Image.new('L', base.size, 0)
+        Ro = (R[0] + 5, R[1])   # het oude matje steekt rechts iets verder uit dan het nieuwe
+        ImageDraw.Draw(old).polygon([L, T, Ro, (Ro[0], Ro[1] + d), (B[0], B[1] + d), (L[0], L[1] + d)], fill=255)
+        old = old.filter(ImageFilter.MaxFilter(9))
+        floor = Image.new('RGB', base.size); floor.paste(base, MAT_FLOOR_SHIFT)
+        base = Image.composite(floor, base, old)
     m = Image.new('L', base.size, 0)
     ImageDraw.Draw(m).polygon([L, T, R, (R[0], R[1] + d), (B[0], B[1] + d), (L[0], L[1] + d)], fill=255)
     return Image.composite(warped, base, m.filter(ImageFilter.MaxFilter(3)))
@@ -102,11 +103,36 @@ def poly_mask(pts, grow=0):
     if grow: m = m.filter(ImageFilter.MaxFilter(grow))
     return np.array(m) > 0
 
-full_raw = load(SRC_FULL)
+# D1 (2026-11-13): achterwand van de kasten donkerder, zodat de flessen afsteken. Plankmaten uit config.js (CC.BG.planks);
+# per vak alleen de donkere pixels boven elke plank (de lichte plankranden blijven). BACK_DARK = 1 zet het uit.
+BACK_DARK, BACK_MAXL = 0.7, 75
+def planks_from_config():
+    import re
+    t = open(os.path.join(ROOT, 'src', 'config.js'), encoding='utf-8').read()
+    out = {}
+    for m in re.finditer(r"(shelf_\d): \{ slope: (-?[\d.]+), x0: (\d+), x1: (\d+), rows: \[([^\]]+)\]", t):
+        out[m.group(1)] = (float(m.group(2)), int(m.group(3)), int(m.group(4)), [float(v) for v in m.group(5).split(',')])
+    return out
+def darken_backs(im, names):
+    if BACK_DARK >= 1: return im
+    a = np.array(im).astype(float); L = a @ [0.299, 0.587, 0.114]
+    for name, (sl, x0, x1, rows) in planks_from_config().items():
+        if name not in names: continue
+        for r in rows:
+            for x in range(x0, x1 + 1):
+                yb = int(round(r + sl * x))
+                for y in range(yb - 16, yb - 1):
+                    if 0 <= y < H and L[y, x] < BACK_MAXL: a[y, x] *= BACK_DARK
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+
+full_raw = darken_backs(load(SRC_FULL), ('shelf_1', 'shelf_2', 'shelf_3', 'shelf_4'))
 start_raw, VIT_MASK = load_start()
+start_raw = darken_backs(start_raw, ('shelf_1', 'shelf_2'))
 full, start = dampen(full_raw), dampen(start_raw)
 # Eén gedeeld palet (64 kleuren, geen dithering): harde pixels en identieke kleuren in alle lagen
-pal = full.quantize(64, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+# D1: palet uit eindfase + startbeeld samen, anders mist het de kleuren van het matje en de vitrine (alleen in het startbeeld)
+_both = Image.new('RGB', (W * 2, H)); _both.paste(full, (0, 0)); _both.paste(start, (W, 0))
+pal = _both.quantize(64, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
 fq = full.quantize(palette=pal, dither=Image.Dither.NONE).convert('RGB')
 sq = start.quantize(palette=pal, dither=Image.Dither.NONE).convert('RGB')
 sq.save(os.path.join(OUT, 'bg_start.png'))
@@ -155,10 +181,14 @@ if os.path.exists(SRC_FASE3) and os.path.exists(SRC_FASEBASIS):
             sh = fb.copy(); sh.paste(f3.crop((x0, y0, x1, y1)), (x0 + dx, y0 + dy), Image.fromarray((m[y0:y1, x0:x1] * 255).astype(np.uint8)))
             src = sh; m = np.roll(np.roll(m, dy, 0), dx, 1)
         mk = np.array(Image.fromarray((m * 255).astype(np.uint8)).resize((W, H), Image.BOX)) > 110
-        img = dampen(src.resize((W, H), Image.LANCZOS)).quantize(palette=pal, dither=Image.Dither.NONE).convert('RGB')
+        img_raw = dampen(src.resize((W, H), Image.LANCZOS))
+        img = img_raw.quantize(palette=pal, dither=Image.Dither.NONE).convert('RGB')
         save_layer(np.array(img), mk, 'decor_' + name, layers)
-        if name == 'lampjes':   # lampjes: heldere stippen → posities voor de twinkeling
-            lay = np.array(img).astype(int); br = (lay.sum(2) >= 590) & (lay[..., 2] < 0.8 * lay[..., 0]) & mk
+        BULBS = os.path.join(ROOT, 'tools', 'lampjes_bulbs.json')
+        if name == 'lampjes' and os.path.exists(BULBS):   # D1: vaste posities (38), gemeten op de laag; de laag zelf verandert niet van plek
+            layers['decor_lampjes']['bulbs'] = json.load(open(BULBS))
+        elif name == 'lampjes':   # lampjes: heldere stippen → posities voor de twinkeling
+            lay = np.array(img_raw).astype(int); br = (lay.sum(2) >= 590) & (lay[..., 2] < 0.8 * lay[..., 0]) & mk
             lab, n = ndimage.label(ndimage.binary_dilation(br, iterations=1))
             layers['decor_lampjes']['bulbs'] = [[round(float(c[1]), 1), round(float(c[0]), 1)] for c in ndimage.center_of_mass(br, lab, range(1, n + 1))]
     # Tegels voor het niveauscherm ("Nieuwe aankleding"), scherp uit de bron: fase 2 = olijf + monstera, fase 3 = terras

@@ -24,7 +24,7 @@ for name, (x0, y0, x1, y1) in BOXES.items():
     m = lum[y0:y1, x0:x1] < DARK
     lab, n = ndimage.label(m)
     sz = ndimage.sum(m, lab, range(1, n + 1)); m = lab == (np.argmax(sz) + 1)   # alleen het voorwerp zelf
-    m = ndimage.binary_closing(m, iterations=1) | m
+    m = ndimage.binary_closing(m, iterations=2 if name == 'lantaarn' else 1) | m   # D1: de nieuwe paal heeft lichtere glimplekken
     if not name.startswith('lantaarn'): m = ndimage.binary_fill_holes(m)
     mask[y0:y1, x0:x1] |= m
 out = im.copy(); out[~mask] = 0          # helemaal leeg buiten de voorwerpen (klein bestand)
