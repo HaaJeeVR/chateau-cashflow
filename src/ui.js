@@ -1550,8 +1550,52 @@
       UI.btn(app, ctx, 'newweek', 320 - 65, 200, 130, 20, `Week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
     }
   };
-  // A10: doos zonder etiket op zondag: de doos valt neer, de flappen gaan open, een fles komt omhoog en de naam verschijnt
+  // D4 (haak C3): doos zonder etiket op zondag, met de kaartbeelden. Eerst de dichte doos (de kaart), even wachten,
+  // dan wisselt hij naar de geopende doos en komt de grote fles van de getrokken wijn eruit omhoog, met de naam eronder.
+  // De fles mag boven het beeld uitsteken. Zonder beelden: de getekende doos van A10.
+  UI.BOX = { scale: 2, open: 0.75, rise: [0.9, 0.55], name: 1.5, btn: 1.8,
+    mouth: { cx: 72, edge: [[30, 30], [105, 41]], rest: 2 } };   // opening in kaartpixels: midden, voorrand (links, rechts), hoe diep de fles blijft staan
   UI.boxReveal = function (app, ctx, rt) {
+    const closed = app.images.card_doos, open = app.images.card_doos_open;
+    const ok = im => im && im.complete && im.naturalWidth;
+    if (!ok(closed) || !ok(open)) return UI.boxRevealDrawn(app, ctx, rt);
+    const s = app.s, sun = app.sunday, w = CC.wineById(s.card.box), T = CC.TEXT.cards.doos, B = UI.BOX, k = B.scale;
+    const ease = q => 1 - Math.pow(1 - Math.max(0, Math.min(1, q)), 3);
+    const IW = 160 * k, IH = 80 * k, ix = 320 - IW / 2, iy = 88;
+    ctx.globalAlpha = 0.6 * Math.min(1, rt / 0.2); R().round(ctx, ix - 12, 56, IW + 24, 268, 12, P.ink); ctx.globalAlpha = 1;
+    HF().draw(ctx, T.title, 320, 64, P.gold2, { align: 'center', shadow: P.ink });
+    // dichte doos: komt kort binnen en schudt even voor hij opengaat
+    const drop = ease(rt / 0.25), shake = rt > 0.5 && rt < B.open ? Math.round(Math.sin(rt * 60) * 1.5) : 0;
+    const y = Math.round(iy - 16 * (1 - drop)), x = ix + shake;
+    R().rect(ctx, x - 2, y - 2, IW + 4, IH + 4, P.ink);
+    const isOpen = rt >= B.open;
+    ctx.drawImage(isOpen ? open : closed, x, y, IW, IH);
+    if (isOpen && !sun.boxOpened) { sun.boxOpened = true; if (CC.FX) CC.FX.sparkle(x + B.mouth.cx * k, y + 34 * k, P.gold2, 10); }
+    // fles: 2× zo groot als het grote flesbeeld, achter de voorrand van de doos (alleen erboven zichtbaar)
+    const im = CC.IMAGES && CC.IMAGES['wine_' + w.id.slice(5) + '_groot'];
+    const up = ease((rt - B.rise[0]) / B.rise[1]);
+    const [[ex0, ey0], [ex1, ey1]] = B.mouth.edge, edgeY = xx => y + k * (ey0 + (ey1 - ey0) * ((xx - x) / k - ex0) / (ex1 - ex0));
+    if (isOpen && rt > B.rise[0]) {
+      const bw = (im && im.naturalWidth ? im.naturalWidth : 13) * k, bh = (im && im.naturalHeight ? im.naturalHeight : 41) * k;
+      const bcx = x + B.mouth.cx * k, rest = edgeY(bcx) + B.mouth.rest * k;     // eindstand: voet een stukje in de doos
+      const bottom = Math.round(rest + (bh + 4) * (1 - up));
+      ctx.save(); ctx.beginPath();
+      ctx.moveTo(x + ex0 * k, 0); ctx.lineTo(x + ex1 * k + 40, 0); ctx.lineTo(x + ex1 * k + 40, edgeY(x + ex1 * k + 40)); ctx.lineTo(x + ex0 * k - 40, edgeY(x + ex0 * k - 40)); ctx.closePath(); ctx.clip();
+      if (im && im.complete && im.naturalWidth) { ctx.imageSmoothingEnabled = false; ctx.drawImage(im, Math.round(bcx - bw / 2), bottom - bh, bw, bh); }
+      else R().bottleMid(ctx, bcx, bottom - 20, w);
+      ctx.restore();
+      if (rt > B.rise[0] + B.rise[1] && !sun.boxSparkled) { sun.boxSparkled = true; if (CC.FX) CC.FX.sparkle(bcx, bottom - bh, P.gold2, 8); }
+    }
+    if (rt > B.name) {
+      ctx.globalAlpha = Math.min(1, (rt - B.name) / 0.25);
+      HF().draw(ctx, w.name, 320, iy + IH + 14, P.cream3, { align: 'center', shadow: P.ink });
+      if (sun.cardMsg) F().draw(ctx, sun.cardMsg, 320, iy + IH + 32, P.cream2, { align: 'center', shadow: P.ink });
+      ctx.globalAlpha = 1;
+    }
+    if (rt > B.btn) UI.btn(app, ctx, 'newweek', 320 - 65, iy + IH + 48, 130, 20, `Week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
+  };
+  // A10: doos zonder etiket op zondag: de doos valt neer, de flappen gaan open, een fles komt omhoog en de naam verschijnt
+  UI.boxRevealDrawn = function (app, ctx, rt) {
     const s = app.s, sun = app.sunday, w = CC.wineById(s.card.box), T = CC.TEXT.cards.doos;
     const ease = k => 1 - Math.pow(1 - Math.max(0, Math.min(1, k)), 3);
     const fade = Math.min(1, rt / 0.2);

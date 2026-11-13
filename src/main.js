@@ -30,6 +30,7 @@
   if (CC.SPRITES) for (const t in CC.SPRITES) for (const v in CC.SPRITES[t]) loadImg('chr_' + t + '_' + v, CC.SPRITES[t][v].src);
   if (CC.PORTRAITS) for (const who in CC.PORTRAITS) for (const m in CC.PORTRAITS[who]) loadImg('por_' + who + '_' + m, CC.PORTRAITS[who][m].src);
   if (CC.BG) { loadImg('bg', CC.BG.image); for (const k in CC.BG.layers) loadImg('layer_' + k, CC.BG.layers[k]); }
+  if (CC.OBJ) for (const k in CC.OBJ) loadImg('obj_' + k, CC.OBJ[k].src);   // D3: tasje en doos
   if (CC.WINE_SPRITES) for (const id in CC.WINE_SPRITES) for (const sz in CC.WINE_SPRITES[id]) loadImg('wine_' + id.slice(5) + '_' + sz, CC.WINE_SPRITES[id][sz].src);
   if (CC.CARD_ART) for (const id in CC.CARD_ART) loadImg('card_' + id, CC.CARD_ART[id].src);
   if (CC.CRITTERS) for (const k in CC.CRITTERS) loadImg('crit_' + k, CC.CRITTERS[k].src);

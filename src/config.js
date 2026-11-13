@@ -49,6 +49,7 @@
     noise: 1.5,             // ± uniform
     pricePenaltyMul: 3,
     qtyWeights: [[1, 50], [2, 33], [3, 17]],
+    boxFromQty: 3,   // D3: vanaf zoveel flessen gaat de klant met een doos naar buiten i.p.v. een tasje (alleen beeld)
     secondChoice: 0.5,      // kans dat een klant bij een uitverkochte favoriet zijn tweede keus pakt
     prefBonus: 1.0,         // klantvoorkeur voor een stijl (zie CUSTOMER_TYPES.likes)
 
@@ -198,19 +199,19 @@
   ];
   CC.cardById = id => CC.CARDS.find(c => c.id === id);
 
-  // Personeel (01_ONTWERP §9). home = vaste plek in de winkel. minLevel = vanaf welk reputatieniveau je hem kunt aannemen.
+  // Personeel (01_ONTWERP §9). home = vaste plek in de winkel; spots = vaste plekken waar hij bij weinig werk heen slentert (D2). minLevel = vanaf welk reputatieniveau je hem kunt aannemen.
   CC.STAFF = {
-    sem: { name: 'Sem', role: 'Vakkenvuller', get wage() { return CC.CONFIG.staffWage.sem; }, minLevel: 2, home: { x: 6.1, y: 1.45 },
+    sem: { name: 'Sem', role: 'Vakkenvuller', get wage() { return CC.CONFIG.staffWage.sem; }, minLevel: 2, home: { x: 6.1, y: 1.45 }, spots: [{ x: 5.2, y: 1.3 }, { x: 3.6, y: 1.3 }, { x: 6.6, y: 2.4 }],
       desc: 'Stagiair. Deelt folders uit, veegt de stoep en vult overdag lege schappen bij.',
       pct: lv => '+' + CC.CONFIG.semCustomers[lv - 1],
       perk: lv => `${CC.STAFF.sem.pct(lv)} klant${CC.CONFIG.semCustomers[lv - 1] === 1 ? '' : 'en'} per dag, vult bij`,   // enkelvoud alleen bij 1
       look: { body: '#5e8a5f', body2: '#2f5541', legs: '#45566b', hair: '#d9a25c', skin: 'skin1', prop: null } },
-    fatima: { name: 'Fatima', role: 'Verkoper', get wage() { return CC.CONFIG.staffWage.fatima; }, minLevel: 5, home: { x: 4.35, y: 5.35 },
+    fatima: { name: 'Fatima', role: 'Verkoper', get wage() { return CC.CONFIG.staffWage.fatima; }, minLevel: 5, home: { x: 4.35, y: 5.35 }, spots: [{ x: 6.3, y: 4.3 }, { x: 3.2, y: 5.6 }, { x: 6.4, y: 3.0 }], idlePose: 'act2',
       desc: 'Klanten die weglopen, krijgen van haar een tweede kans.',
       pct: lv => Math.round(CC.CONFIG.fatimaChance[lv - 1] * 100) + '%',
       perk: lv => `haalt ${CC.STAFF.fatima.pct(lv)} van de weglopers terug`,
       look: { body: '#9c2a35', body2: '#6e1a26', legs: '#2f2a36', hair: '#1f0a0e', skin: 'skin2', prop: null } },
-    dubois: { name: 'Meneer Dubois', role: 'Sommelier', get wage() { return CC.CONFIG.staffWage.dubois; }, minLevel: 7, home: { x: 1.45, y: 5.9 },
+    dubois: { name: 'Meneer Dubois', role: 'Sommelier', get wage() { return CC.CONFIG.staffWage.dubois; }, minLevel: 7, home: { x: 1.45, y: 5.9 }, spots: [{ x: 1.4, y: 4.6 }, { x: 2.3, y: 3.2 }, { x: 2.3, y: 5.5 }], idlePose: 'act1',
       desc: 'Kenners kopen bij hem duurder. Hij neemt ook jouw adviesvragen over.',
       pct: lv => Math.round(CC.CONFIG.duboisSkill[lv - 1] * 100) + '%',
       perk: lv => `kenners +${Math.round((CC.CONFIG.duboisBudget[lv - 1] - 1) * 100)}% budget, weet ${CC.STAFF.dubois.pct(lv)}`,

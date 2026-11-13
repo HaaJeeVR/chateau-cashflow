@@ -9,6 +9,7 @@
 #          rij 3: bruiloft, buurtapp, kassa, parkeren
 #          rij 4: stroom
 # Ontbreekt een blad, dan houden die kaarten hun getekende placeholder.
+# Los:     art_bronnen/kaarten/doos_open.png → card_doos_open.png (D4: de doos zonder etiket, open)
 # Uitvoer: assets/card_<id>.png (160 × 80, het vak op de kaart) + assets/cards.js
 # Draaien: python tools/build_cards.py
 # De panelen worden gevonden op de magenta (of donkere) tussenruimte; anders een gelijk raster.
@@ -59,6 +60,18 @@ for fname, COLS, ROWS, THR, ORDER in SHEETS:
         name = f'card_{cid}.png'
         p.save(os.path.join(OUT, name))
         meta[cid] = {'src': 'assets/' + name, 'w': W, 'h': H}
+# Losse beelden (2 : 1), zelfde behandeling: D4 de geopende doos zonder etiket
+SINGLE = [('doos_open.png', 'doos_open')]
+for fname, cid in SINGLE:
+    SRC = os.path.join(ROOT, 'art_bronnen', 'kaarten', fname)
+    if not os.path.exists(SRC):
+        print('ontbreekt (overgeslagen):', fname); continue
+    im = Image.open(SRC).convert('RGB'); pw, ph = im.size
+    if pw / ph > W / H: nw = ph * W / H; box = ((pw - nw) / 2, 0, (pw + nw) / 2, ph)
+    else: nh = pw * H / W; box = (0, (ph - nh) / 2, pw, (ph + nh) / 2)
+    p = im.crop(tuple(round(v) for v in box)).resize((W, H), Image.LANCZOS)
+    p = p.quantize(48, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
+    p.save(os.path.join(OUT, f'card_{cid}.png')); meta[cid] = {'src': f'assets/card_{cid}.png', 'w': W, 'h': H}
 open(os.path.join(OUT, 'cards.js'), 'w').write(
     '// gegenereerd door tools/build_cards.py\n(window.CC = window.CC || {}).CARD_ART = ' + json.dumps(meta) + ';\n')
 print(f'{len(meta)} kaartillustraties gemaakt.')

@@ -189,7 +189,7 @@
             } else if ((c.fatima = SIM().secondChance(s, c, d.rng))) {
               // Fatima grijpt in: tweede kans
               c.want = c.fatima; c.src = 'fatima'; d.log.fatima = (d.log.fatima || 0) + 1;
-              const fa = staffOf(d, 'fatima'); if (fa) say(fa, CC.pickText(CC.TEXT.staff.fatima, d.rng), 'green', 2.2);
+              const fa = staffOf(d, 'fatima'); if (fa) { say(fa, CC.pickText(CC.TEXT.staff.fatima, d.rng), 'green', 2.2); DAY.pose(fa, 'act1', 2.2, c); }
               const vak = SIM().vakOfWine(s, c.want.wineId);
               const f = CC.FURNITURE.find(ff => ff.vakken && ff.vakken.includes(vak));
               const spot = CC.shelfSpot(f);
@@ -243,7 +243,7 @@
             const du = SIM().hired(s, 'dubois') ? SIM().duboisAnswer(s, c.ask, d.rng) : undefined;
             if (du !== undefined) {
               // meneer Dubois neemt het over
-              const a = staffOf(d, 'dubois'); if (a) say(a, CC.pickText(CC.TEXT.staff.dubois, d.rng), 'gold', 2.2);
+              const a = staffOf(d, 'dubois'); if (a) { say(a, CC.pickText(CC.TEXT.staff.dubois, d.rng), 'gold', 2.2); DAY.pose(a, 'act2', 2.2, c); }
               const res = DAY.answer(d, s, c, du);
               res.byDubois = true; d.log.advice.dubois = (d.log.advice.dubois || 0) + 1; c.src = 'dubois';
             } else {
@@ -315,7 +315,8 @@
   // Personeel tijdens de verkoopdag. Alleen Sem loopt; Fatima en Dubois reageren op klanten (zie hierboven).
   function stepStaff(d, s, a, dt) {
     if (a.bubble) { a.bubble.t -= dt; if (a.bubble.t <= 0) a.bubble = null; }
-    if (a.staffId !== 'sem') { DAY.idleStep(a, dt, d.idleRng); return; }
+    if (a.poseT != null) { a.poseT -= dt; if (a.poseT <= 0) { a.pose = null; a.poseT = null; } }
+    if (a.staffId !== 'sem') { if (a.poseT == null) DAY.idleStep(a, dt, d.idleRng); else a.moving = false; return; }
     switch (a.state) {
       case 'home':
         a.timer -= dt;
@@ -333,11 +334,13 @@
         DAY.idleStep(a, dt, d.idleRng);   // niets bij te vullen: rondslenteren i.p.v. stilstaan
         break;
       case 'toShelf':
-        if (walk(a, dt)) { a.state = 'stock'; a.timer = 1.2 / a.speedMul; a.toward = false; }
+        if (walk(a, dt)) { a.state = 'stock'; a.timer = a.stockT = 1.2 / a.speedMul; a.toward = false; }
         break;
       case 'stock':
         a.moving = false; a.timer -= dt;
+        a.pose = a.timer > a.stockT * 0.6 ? 'act1' : 'act2';   // D2: fles pakken, dan in het schap zetten
         if (a.timer <= 0) {
+          a.pose = null;
           const n = SIM().refillVak(s, a.vak);
           if (n > 0) { d.log.semRefill = (d.log.semRefill || 0) + n; if (d.rng() < 0.4) say(a, CC.pickText(CC.TEXT.staff.sem, d.rng), 'grey', 1.6); }
           const h = CC.STAFF.sem.home;
@@ -360,9 +363,18 @@
     if (a.idle === 'rest') {
       a.moving = false; a.idleT -= dt;
       if (a.idleT <= 0) {
-        const tx = Math.max(1.0, Math.min(7.2, home.x + (rand() - 0.5) * 2.4));
-        const ty = Math.max(1.0, Math.min(7.2, home.y + (rand() - 0.5) * 2.4));
-        a.path = route(a, { x: tx, y: ty }); a.idle = 'walk'; a.speedMul = 0.55;
+        a.pose = null;
+        const spots = CC.STAFF[a.staffId].spots;
+        let tg;
+        if (spots && spots.length) {   // D2: tussen vaste plekken, niet twee keer dezelfde
+          const pool = spots.filter(p => Math.hypot(p.x - a.x, p.y - a.y) > 0.3);
+          tg = pool[Math.floor(rand() * pool.length)] || spots[0];
+        } else {
+          tg = { x: Math.max(1.0, Math.min(7.2, home.x + (rand() - 0.5) * 2.4)), y: Math.max(1.0, Math.min(7.2, home.y + (rand() - 0.5) * 2.4)) };
+        }
+        a.path = route(a, tg); a.idle = 'walk'; a.speedMul = 0.55;
+      } else if (a.idleT > 1 && !a.pose && CC.STAFF[a.staffId].idlePose && rand() < dt * 0.25) {
+        a.pose = CC.STAFF[a.staffId].idlePose;   // D2: even iets doen tijdens het wachten (Dubois poetst een glas)
       }
     } else if (a.idle === 'walk') {
       if (walk(a, dt)) {
@@ -379,6 +391,12 @@
     } else if (a.idle === 'home') {
       if (walk(a, dt)) { a.idle = 'rest'; a.idleT = 4 + rand() * 6; a.toward = true; a.speedMul = a.staffId === 'sem' ? a.baseSpeed : 1; }
     }
+  };
+
+  // D2: actiebeeld voor even (alleen beeld); kijkt naar wie hij aanspreekt
+  DAY.pose = function (a, pose, t, who) {
+    a.pose = pose; a.poseT = t; a.moving = false; a.path = []; a.idle = 'look'; a.idleT = t;
+    if (who) { const sdx = (who.x - a.x) - (who.y - a.y), sdy = (who.x - a.x) + (who.y - a.y); a.face = sdx >= 0 ? 1 : -1; a.toward = sdy > -0.3; }
   };
 
   // Alles in één keer doorrekenen (knop 'overslaan')

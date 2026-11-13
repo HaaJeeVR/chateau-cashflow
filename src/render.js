@@ -878,14 +878,36 @@
       img = f === 0 ? w2 : f === 2 ? w3 : stand;
       step = 0;   // de benen doen het werk; geen wip, zodat niemand opspringt bij de wissel
     }
+    if (!c.moving && c.pose && ready(images[key + '_' + c.pose])) img = images[key + '_' + c.pose];   // D2: actiebeeld personeel
     const w = img.naturalWidth, h = img.naturalHeight;
     const native = (CC.SPRITE_FACING[look] || CC.SPRITE_FACING[c.type] || {})[view] || -1;
     const flip = (c.face || -1) !== native;
     ctx.globalAlpha = c.alpha == null ? 1 : c.alpha;
     ctx.fillStyle = 'rgba(31,10,14,0.35)'; ctx.fillRect(sx - 10, sy0 - 2, 21, 4); ctx.fillRect(sx - 7, sy0 - 3, 15, 1);
     const x = Math.round(sx - w / 2), y = Math.round(sy0 - h + 1 - step);
+    // D3: na het afrekenen een tasje (1 fles, 2 flessen) of een doos (vanaf CONFIG.boxFromQty) mee naar buiten.
+    // Een doos zit vóór het lijf: van achteren gezien tekenen we hem eerst, zodat de figuur ervoor staat.
+    const bagQty = (c.want && c.want.qty) || 1, bagBack = !!(c.bag && !c.staff && CC.OBJ);
+    const drawBag = () => {
+      const qty = bagQty, kind = qty >= (CC.CONFIG.boxFromQty || 4) ? 'doos6' : qty >= 2 ? 'tas2' : 'tas1', ob = images['obj_' + kind];
+      if (ready(ob)) {
+        const ow = ob.naturalWidth, oh = ob.naturalHeight, hand = (CC.HAND && CC.HAND[look] && CC.HAND[look][view]) || null;
+        let ox, oy;
+        if (kind === 'doos6' || !hand) { ox = Math.round(sx - ow / 2); oy = Math.round(y + h * 0.5); }   // doos: met twee handen voor het lijf
+        else {
+          const scr = -(c.face || -1);                       // de achterste hand (niet de hand waarmee hij de weg wijst)
+          const imgSide = (scr < 0) !== flip ? 'l' : 'r';    // gespiegeld beeld: links wordt rechts
+          const hx = flip ? w - 1 - hand[imgSide][0] : hand[imgSide][0], hy = hand[imgSide][1];
+          ox = Math.round(x + hx + (scr < 0 ? -ow + 3 : -2)); oy = Math.round(y + hy - 4);
+        }
+        ctx.drawImage(ob, ox, oy);
+      }
+    };
+    const boxBehind = bagBack && view === 'back' && bagQty >= (CC.CONFIG.boxFromQty || 4);
+    if (boxBehind) drawBag();
     if (flip) { ctx.save(); ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0); ctx.restore(); }
     else ctx.drawImage(img, x, y);
+    if (bagBack && !boxBehind) drawBag();   // na het tekenen: tasje in de hand, doos voor het lijf
     // gekozen fles(sen) in de hand, met een getal als het er meer zijn (klanten kopen 1–3 flessen)
     if (c.carry && !c.staff) {
       const qty = (c.want && c.want.qty) || 1;
