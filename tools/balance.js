@@ -314,7 +314,7 @@ function botMishap(s, rng, e, lastSold) {
   S.decideMishap(s, choice, rng);
 }
 
-let STAT;
+let KOERS = {}; let STAT;
 function run(botName, seed) {
   const s = CC.newState(seed); const bot = BOTS[botName];
   let lastSold = {}, w1min = Infinity;
@@ -343,6 +343,7 @@ function run(botName, seed) {
     }
     const r = S.payWeek(s);
     if (!r.ok) { if (!S.postpone(s).ok) { S.bankrupt(s); return { win: false, week: s.week, level: s.level, cash: s.cash, w1min }; } STAT.postponed++; }
+    if (S.onCourse) { const oc = S.onCourse(s); if (oc && s.week >= 3 && s.week <= 7) (KOERS[s.week] = KOERS[s.week] || []).push([oc.state, s]); }
     if (r.won) return { win: true, week: 8, level: s.level, cash: s.cash, w1min };
     if (!NOCARDS && !NOPICK && !bot.lazy) botCard(s, S.offerCards(s, CC.makeRng(s)), CC.makeRng(s), est(s));
     S.startWeek(s); if (s.weekKlus) { STAT.wkOffered++; STAT.wkBy[s.weekKlus.id] = (STAT.wkBy[s.weekKlus.id] || 0) + 1; if (!S.weekKlusOk || !S.weekKlusOk(s, s.weekKlus)) STAT.wkBad++; }
@@ -355,7 +356,16 @@ console.log('bot        winst%  eindkas(med)  niveau(med)  failliet in week (ver
 const ONLY = process.env.BOTS ? process.env.BOTS.split(',') : Object.keys(BOTS);
 for (const name of ONLY) {
   STAT = { days: 0, soldOut: 0, sem: 0, fatima: 0, dubois: 0, wages: 0, w1Short: 0, orders: 0, ordersOk: 0, postponed: 0, wkDone: 0, wkOffered: 0, wkBy: {}, wkDoneBy: {}, wkBad: 0, cards: {}, xp: {}, xpd: {}, gain: {}, upg: 0, lvDay: {}, klus: {} };
+  KOERS = {};
   const res = []; for (let i = 0; i < RUNS; i++) res.push(run(name, 1000 + i));
+  if (process.env.KOERS) {   // B3: wat zei de meter op zondag van week 3–7, tegenover hoe het afliep
+    const line = [];
+    for (const w in KOERS) {
+      const t = {}; for (const [st, ss] of KOERS[w]) { const k = st + (ss.status === 'won' ? '+' : '-'); t[k] = (t[k] || 0) + 1; }
+      line.push(`wk${w} ` + ['ruim', 'krap', 'weinig'].map(st => `${st} ${t[st + '+'] || 0}w/${t[st + '-'] || 0}v`).join(' '));
+    }
+    console.log(`  koers ${name}: ` + line.join(' | '));
+  }
   const wins = res.filter(r => r.win);
   const med = a => { if (!a.length) return '-'; a = a.slice().sort((x, y) => x - y); return Math.round(a[a.length >> 1]); };
   const fails = {}; res.filter(r => !r.win).forEach(r => fails[r.week] = (fails[r.week] || 0) + 1);

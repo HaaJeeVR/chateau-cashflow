@@ -182,7 +182,8 @@
       R().rect(ctx, bx, 5, bw, 7, P.wood1);
       R().rect(ctx, bx + 1, 6, Math.round((bw - 2) * frac), 5, col);
       const tip = `Aflossing zondag: ${R().euro(due)}. Kas ${R().euro(s.cash)}` + (left > 0 ? ` min nog te betalen huur en loon deze week ${R().euro(left)} = ${R().euro(Math.round(avail))}.` : '.') +
-        (avail >= due ? ' Gedekt.' : ` Nog ${R().euro(Math.ceil(due - avail))} nodig.`) + ` Nog te gaan in totaal: ${R().euro(CC.SIM.debtLeft(s))}.`;
+        (avail >= due ? ' Gedekt.' : ` Nog ${R().euro(Math.ceil(due - avail))} nodig.`) + ` Nog te gaan in totaal: ${R().euro(CC.SIM.debtLeft(s))}.` +
+        (CC.SIM.onCourse(s) ? '\n' + UI.koersTip(CC.SIM.onCourse(s)) : '');
       UI.hit(app, 'hud_due', 194, 0, 120, 16, null, tip);
     } else if (s.status === 'endless') F().draw(ctx, 'Schuldenvrij', 196, 4, P.green4);
     // reputatie
@@ -239,7 +240,7 @@
     const h = app.touchInput ? UI.pickTouch(app.mouse.x, app.mouse.y, app.touchMin()) : UI.pick(app.mouse.x, app.mouse.y);
     if (!h || !h.tip) return;
     // lange tips breken af; het vakje blijft altijd helemaal in beeld
-    const lines = F().wrap(h.tip, 240);
+    const lines = []; String(h.tip).split('\n').forEach((para, i) => { if (i) lines.push(''); lines.push(...F().wrap(para, 240)); });   // B3: \n = nieuwe alinea
     const w = Math.max(...lines.map(l => F().width(l))) + 8, th = lines.length * 10 + 4;
     let x = app.mouse.x + 8, y = app.mouse.y + 10;
     if (x + w + 2 > 638) x = app.mouse.x - w - 6;
@@ -975,6 +976,7 @@
     F().draw(ctx, 'Lening afgelost', x + 190, y + 48, P.ink);
     R().round(ctx, x + 190, y + 60, 150, 9, 4, P.wood1); if (paid > 0) R().round(ctx, x + 191, y + 61, Math.max(7, Math.round(148 * paid / total)), 7, 3, P.green3);
     F().draw(ctx, `${R().euro(paid)} van ${R().euro(total)}`, x + 190, y + 71, P.stone1);
+    UI.koersMeter(app, ctx, x + 190, y + 86);   // B3
     }
     // gesprek
     const by = y + 128;
@@ -996,6 +998,35 @@
       UI.btn(app, ctx, 'newweek', bx, byy, 130, 20, `Week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
       if (s.postponed && s.status === 'playing') UI.restartBtn(app, ctx, bx + 136, byy, 112, 20);   // A8: na uitstel
     }
+  };
+  // B3: op-koers-meter. Drie vakjes (te weinig · krap · ruim), het actieve fel, met één regel uitleg en een tooltip
+  // die het voorrekent. Zelfde getallen als de tooltip op de aflossingsbalk (SIM.onCourse).
+  UI.KOERS_LBL = { weinig: 'Te weinig', krap: 'Krap', ruim: 'Ruim' };
+  UI.koersTip = function (oc) {
+    if (!oc) return '';
+    const tot = oc.terms > 1 ? `de komende ${oc.terms} termijnen (t/m zondag week ${oc.untilWeek})` : `de termijn van zondag week ${oc.untilWeek}`;
+    const pace = oc.days === 1 ? '1 verkoopdag' : `${oc.days} verkoopdagen`;
+    const head = `Op koers: ${UI.KOERS_LBL[oc.state].toLowerCase()}. `;
+    if (oc.need <= 0) return head + `Je kas dekt ${tot} al.`;
+    return head + `Je maakt gemiddeld ${R().euro(oc.avg)} winst per dag (na huur en loon, ${pace}). ` +
+      `Voor ${tot} heb je nog ${R().euro(Math.max(0, oc.debt - oc.cash))} nodig bovenop je kas: ${R().euro(oc.need)} per dag over ${oc.daysLeft} dagen. ` +
+      (oc.state === 'ruim' ? 'Ruim voldoende.' : oc.state === 'krap' ? 'Het kan net; een slechte dag en het wordt spannend.' : 'Zo red je het niet: verkoop meer of met meer marge.');
+  };
+  UI.koersMeter = function (app, ctx, x, y) {
+    const oc = CC.SIM.onCourse(app.s);
+    if (!oc) return;
+    F().draw(ctx, 'Op koers', x, y, P.ink);
+    const order = ['weinig', 'krap', 'ruim'], cols = { weinig: P.red, krap: P.gold, ruim: P.green3 };
+    const sw = 52, sy = y + 12;
+    order.forEach((k, i) => {
+      const on = oc.state === k, sx = x + i * (sw + 3);
+      R().round(ctx, sx, sy, sw, 11, 4, on ? P.ink : P.wood1);
+      R().round(ctx, sx + 1, sy + 1, sw - 2, 9, 3, on ? cols[k] : P.cream1);
+      F().draw(ctx, UI.KOERS_LBL[k], sx + sw / 2, sy + 2, on ? (k === 'krap' ? P.ink : P.cream3) : P.stone2, { align: 'center' });
+    });
+    const line = oc.need <= 0 ? 'Kas dekt de komende termijnen' : `${R().euro(oc.avg)}/dag · nodig ${R().euro(oc.need)}/dag`;
+    F().draw(ctx, line, x, sy + 15, P.stone1);
+    UI.hit(app, 'koers', x - 2, y - 2, 3 * sw + 10, 40, null, UI.koersTip(oc));
   };
   // A8: "Opnieuw beginnen" na uitstel; vraagt eerst bevestiging (hetzelfde venster als Nieuw spel, met reservekopie)
   UI.restartBtn = function (app, ctx, x, y, w, h) {

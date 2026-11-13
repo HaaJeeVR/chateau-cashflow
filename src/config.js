@@ -49,7 +49,8 @@
     noise: 1.5,             // ± uniform
     pricePenaltyMul: 3,
     qtyWeights: [[1, 50], [2, 33], [3, 17]],
-    boxFromQty: 3,   // D3: vanaf zoveel flessen gaat de klant met een doos naar buiten i.p.v. een tasje (alleen beeld)
+    boxFromQty: 3,
+    koers: { ruim: 1.25, krap: 0.9, weeks: 2 },   // B3: op-koers-meter, gemiddelde winst/dag gedeeld door wat de resterende termijnen per dag vragen   // D3: vanaf zoveel flessen gaat de klant met een doos naar buiten i.p.v. een tasje (alleen beeld)
     secondChoice: 0.5,      // kans dat een klant bij een uitverkochte favoriet zijn tweede keus pakt
     prefBonus: 1.0,         // klantvoorkeur voor een stijl (zie CUSTOMER_TYPES.likes)
 

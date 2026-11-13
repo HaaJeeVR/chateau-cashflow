@@ -882,6 +882,28 @@
   // ook niet na herladen; een uitgesteld bedrag (carry) telt pas vanaf volgende week.
   SIM.bankDone = function (s) { return s.bankDoneWeek === s.week; };
   SIM.weekDue = function (s) { return SIM.inLoan(s) && !SIM.bankDone(s) ? C().repay[s.week - 1] + s.carry : 0; };
+  // B3: op koers? Gemiddelde winst per verkoopdag (na huur en loon) van deze week, of van vorige week zolang er deze
+  // week nog niet verkocht is, tegenover wat de resterende termijnen per verkoopdag vragen bovenop de kas van nu.
+  // Standen: ruim · krap · te weinig (CONFIG.koers). null buiten de lening of zonder verkoopdagen.
+  SIM.onCourse = function (s) {
+    if (!SIM.inLoan(s)) return null;
+    const D = C().daysPerWeek, K = C().koers, R = C().repay;
+    let wk = s.history.filter(h => h.week === s.week);
+    if (!wk.length) wk = s.history.filter(h => h.week === s.week - 1);
+    if (!wk.length) return null;
+    const avg = wk.reduce((a, h) => a + h.profit, 0) / wk.length;
+    // horizon: de eerstvolgende K.weeks termijnen (wie verder vooruit rekent met het tempo van nu, ziet in week 3
+    // altijd "te weinig", omdat de marge nog groeit met je niveau)
+    const first = s.week - 1 + (SIM.bankDone(s) ? 1 : 0), last = Math.min(R.length, first + K.weeks);
+    if (first >= R.length) return null;
+    let debt = s.carry; for (let i = first; i < last; i++) debt += R[i];
+    const daysLeft = (last - s.week) * D + Math.max(0, D - s.day);
+    if (daysLeft <= 0) return null;
+    const short = Math.max(0, debt - s.cash), need = short / daysLeft;
+    const ratio = need > 0 ? avg / need : Infinity;
+    const state = ratio >= K.ruim ? 'ruim' : ratio >= K.krap ? 'krap' : 'weinig';
+    return { avg: Math.round(avg), need: Math.round(need), debt, terms: last - first, untilWeek: last, cash: s.cash, daysLeft, days: wk.length, ratio, state };
+  };
   SIM.debtLeft = function (s) {
     const R = C().repay; let left = s.carry;
     for (let i = s.week - 1 + (SIM.bankDone(s) ? 1 : 0); i < R.length; i++) left += R[i];
