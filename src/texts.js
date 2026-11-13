@@ -169,6 +169,7 @@
     assort: {
       proposal: 'Ik heb aangevuld tot je lijst van gisteren. Kijk even, en zeg het maar.',
       empty: 'Wat mag het zijn? Per zes of per twaalf, ik lever direct.',
+      discount: 'Je weekklus is gehaald: {n}% korting op deze bestelling.',
       first: 'Je eerste bestelling. Per zes of per twaalf, ik lever direct. Morgen stel ik voor aan te vullen tot wat je nu neemt.',
       done: 'Komt eraan. Nog iets?',
       blocked: 'Mijn busje staat bij de wegsleepdienst. Woensdag ben ik er weer.',
@@ -247,6 +248,17 @@
       6: 'Verkoop {need} flessen Bordeaux of Port',
       7: 'Verkoop {need} flessen aan statuszoekers',
       8: 'Verkoop {need} flessen Champagne',
+    },
+    // Weekklus (B1). Zakelijke teksten; de echte klusteksten levert Fable.
+    weekKlus: {
+      title: 'Klus van de week',
+      from: { bankier: 'Montenegro', ronnie: 'Ronnie' },
+      wk_flessen: 'Verkoop deze week {need} flessen',
+      wk_type: 'Verkoop deze week {need} flessen aan {types}',
+      wk_variety: 'Verkoop op één dag {need} verschillende wijnen',
+      cash: '+{n}', rep: '+{n} reputatie', discount: '{n}% korting op je volgende bestelling',
+      sunday: '{from} heeft een klus voor week {week}',
+      tip: 'Klus van de week van {from}: {text}. Beloning: {reward}. Geldt tot en met zaterdag.',
     },
     klusUi: { title: 'Klus', reward: 'beloning {r}', done: 'Klus gehaald! {r}', newKlus: 'Nieuwe klus', repR: '+{n} reputatie', cashR: '+{n} (de wijnclub trakteert)' },
     // Avondinzicht (besluit 75): één feitelijke zin over de dag, met een klik naar die wijn

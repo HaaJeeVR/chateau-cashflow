@@ -529,8 +529,8 @@
     ry += 3;
     for (const kd of sm.klusDone || []) {   // klus gehaald: groen vinkje
       R().round(ctx, rx, ry - 2, rw, 12, 4, '#e9f2dc');
-      const kr = kd.rep ? `+${kd.rep} ★` : '+' + R().euro(kd.cash), maxW = rw - F().width(kr) - 16;
-      let kt = '✔ ' + UI.klusText(kd.lvl); while (F().width(kt) > maxW && kt.length > 4) kt = kt.slice(0, -2) + '.';
+      const kr = kd.rep ? `+${kd.rep} ★` : kd.discount ? `-${Math.round(kd.discount * 100)}%` : '+' + R().euro(kd.cash), maxW = rw - F().width(kr) - 16;
+      let kt = '✔ ' + (kd.wk ? UI.weekKlusText({ id: kd.wk, need: kd.need, type: (s.weekKlus || {}).type }) : UI.klusText(kd.lvl)); while (F().width(kt) > maxW && kt.length > 4) kt = kt.slice(0, -2) + '.';
       F().draw(ctx, kt, rx + 4, ry, P.green2);
       F().draw(ctx, kr, rx + rw - 4, ry, P.green2, { align: 'right' });
       ry += 14;
@@ -728,6 +728,32 @@
     if (ref.type) return { kind: 'type', id: ref.type, a: CC.TEXT.typeInfo[ref.type].many };
     return null;
   }
+  // B1: weekklus
+  UI.weekKlusText = function (k) {
+    const T = CC.TEXT.weekKlus, types = k.type ? CC.TEXT.typeInfo[k.type].many : '';
+    return (T[k.id] || k.id).split('{need}').join(k.need).split('{types}').join(types);
+  };
+  UI.weekKlusReward = function (k) {
+    const r = CC.SIM.weekKlusDef(k.id).reward, T = CC.TEXT.weekKlus;
+    return r.cash ? T.cash.split('{n}').join(R().euro(r.cash)) : r.rep ? T.rep.split('{n}').join(r.rep) : T.discount.split('{n}').join(Math.round(r.discount * 100));
+  };
+  UI.weekKlusTip = function (k) {
+    const d = CC.SIM.weekKlusDef(k.id), T = CC.TEXT.weekKlus;
+    return T.tip.split('{from}').join(T.from[d.giver]).split('{text}').join(UI.weekKlusText(k)).split('{reward}').join(UI.weekKlusReward(k));
+  };
+  // Zondag: welke klus komt er volgende week? Strook met wie hem geeft, de klus en de beloning
+  UI.weekKlusStrip = function (app, ctx, y) {
+    const k = app.s.nextWeekKlus; if (!k) return;
+    const d = CC.SIM.weekKlusDef(k.id), T = CC.TEXT.weekKlus;
+    const head = T.sunday.split('{from}').join(T.from[d.giver]).split('{week}').join(k.week);
+    const body = UI.weekKlusText(k) + ' · ' + UI.weekKlusReward(k);
+    const w = Math.max(F().width(head), F().width(body)) + 28, x = 320 - Math.round(w / 2), h = 28;
+    R().round(ctx, x + 2, y + 3, w, h, 6, 'rgba(31,10,14,0.35)');
+    R().round(ctx, x, y, w, h, 6, P.ink); R().round(ctx, x + 1, y + 1, w - 2, h - 2, 5, P.wood1); R().round(ctx, x + 2, y + 2, w - 4, h - 4, 5, 'rgba(31,10,14,0.92)');
+    F().draw(ctx, head, 320, y + 5, P.gold, { align: 'center' });
+    F().draw(ctx, body, 320, y + 16, P.cream2, { align: 'center' });
+    UI.hit(app, 'weekklus_next', x, y, w, h, null, UI.weekKlusTip(k));
+  };
   UI.klusText = function (lvl) { const d = CC.SIM.klusDef(lvl); return d ? CC.TEXT.klus[lvl].split('{need}').join(d.need) : ''; };
   UI.klusReward = function (lvl) { const d = CC.SIM.klusDef(lvl), U = CC.TEXT.klusUi; return d.rep ? U.repR.split('{n}').join(d.rep) : U.cashR.split('{n}').join(R().euro(d.cash)); };
   UI.levelPanel = function (app, ctx) {
@@ -810,23 +836,27 @@
   UI.klusBoard = function (app, ctx, y) {
     const s = app.s;
     if (!s.flags.opened) return UI.firstDayList(app, ctx, y);   // eerste dag: eerst de checklist
-    const open = CC.SIM.klusOpen(s).slice(0, 2); if (!open.length) return;
+    const wk = CC.SIM.weekKlusOpen(s);   // B1: klus van de week bovenaan, in goud
+    const open = CC.SIM.klusOpen(s).slice(0, wk ? 1 : 2); if (!open.length && !wk) return;
     const x = LX, w = LW;
     // A5: de tekst mag over twee regels, zodat wijn of klanttype altijd zichtbaar is
-    const rows = open.map(k => { const txt = UI.klusText(k.lvl), ls = F().wrap(txt, w - 16); if (ls.length > 2) { ls.length = 2; ls[1] = ls[1] + '..'; } return { k, txt, ls, h: ls.length * 10 + 12 }; });
+    const mk = (k, txt, week) => { const ls = F().wrap(txt, w - 16); if (ls.length > 2) { ls.length = 2; ls[1] = ls[1] + '..'; } return { k, txt, ls, h: ls.length * 10 + 12, week }; };
+    const rows = (wk ? [mk(wk, UI.weekKlusText(wk), true)] : []).concat(open.map(k => mk(k, UI.klusText(k.lvl), false)));
     const h = 14 + rows.reduce((a, r) => a + r.h, 0);
     R().round(ctx, x + 2, y + 3, w, h, 6, 'rgba(31,10,14,0.35)');
     R().round(ctx, x, y, w, h, 6, P.ink); R().round(ctx, x + 1, y + 1, w - 2, h - 2, 5, P.wood1); R().round(ctx, x + 2, y + 2, w - 4, h - 4, 5, 'rgba(31,10,14,0.92)');
-    F().draw(ctx, CC.SIM.klusOpen(s).length > 1 ? 'Klussen' : 'Klus', x + 8, y + 6, P.gold);
+    F().draw(ctx, rows.length > 1 ? 'Klussen' : 'Klus', x + 8, y + 6, P.gold);
     let ky = y + 17;
-    rows.forEach(({ k, txt, ls, h: rh }) => {
-      const d = CC.SIM.klusDef(k.lvl);
-      ls.forEach((l, j) => F().draw(ctx, l, x + 8, ky + j * 10, P.cream2));
-      UI.hit(app, 'klus_' + k.lvl, x + 3, ky - 2, w - 6, rh - 2, null, `${txt} · ${UI.klusReward(k.lvl)} (klus van niveau ${k.lvl})`);
+    rows.forEach(({ k, txt, ls, h: rh, week }) => {
+      const d = week ? { need: k.need } : CC.SIM.klusDef(k.lvl);
+      ls.forEach((l, j) => F().draw(ctx, l, x + 8, ky + j * 10, week ? P.gold2 : P.cream2));
+      if (week) UI.hit(app, 'klus_wk', x + 3, ky - 2, w - 6, rh - 2, null, UI.weekKlusTip(k));
+      else UI.hit(app, 'klus_' + k.lvl, x + 3, ky - 2, w - 6, rh - 2, null, `${txt} · ${UI.klusReward(k.lvl)} (klus van niveau ${k.lvl})`);
       const by = ky + ls.length * 10, bw = w - 66, f = Math.min(1, k.n / d.need);
       R().rect(ctx, x + 8, by, bw, 4, P.wood1); R().rect(ctx, x + 8, by, Math.round(bw * f), 4, P.gold);
       F().draw(ctx, `${k.n}/${d.need}`, x + w - 8, by - 1, P.cream2, { align: 'right' });
       ky += rh;
+      if (week && rows.length > 1) R().rect(ctx, x + 8, ky - 4, w - 16, 1, 'rgba(232,181,58,0.35)');   // weekklus (goud) los van de niveauklussen
     });
   };
 
@@ -1484,6 +1514,7 @@
       UI.btn(app, ctx, 'newweek', 320 - 80, y0 + CH + 12, 160, 20, `Zonder kaart naar week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
     }
     if (s.postponed && s.status === 'playing' && t > 1.2) UI.restartBtn(app, ctx, 640 - 124, 334, 116, 18);   // A8: rechtsonder, uit de weg
+    if (!sun.chosen && t > 1.2) UI.weekKlusStrip(app, ctx, 312);   // B1: de klus voor volgende week
     if (sun.chosen === 'doos' && s.card && s.card.box && ct > 1.1) { UI.boxReveal(app, ctx, ct - 1.1); return; }   // A10
     if (sun.chosen && ct > 1.1) {
       const T = CC.TEXT.cards[sun.chosen];
@@ -1997,7 +2028,7 @@
     // Ronnie
     UI.portrait(app, ctx, 'leverancier', 'neutral', x + 14, y + 32, 40);
     const total = Object.values(order).reduce((a, b) => a + (b || 0), 0);
-    let say = blocked ? T.blocked : vakMode ? T.forVak.split('{n}').join(CC.vakNumber(vakMode)) : app.orderMsg ? app.orderMsg : app.proposed ? T.proposal : !s.history.length ? T.first : T.empty;   // A4: alleen "aangevuld" als Ronnie echt iets voorstelde
+    let say = blocked ? T.blocked : vakMode ? T.forVak.split('{n}').join(CC.vakNumber(vakMode)) : app.orderMsg ? app.orderMsg : s.orderDiscount ? T.discount.split('{n}').join(Math.round(s.orderDiscount * 100)) : app.proposed ? T.proposal : !s.history.length ? T.first : T.empty;   // A4: alleen "aangevuld" als Ronnie echt iets voorstelde
     const bw = AW - 86, name = 'Ronnie:', lines = F().wrap(name + ' ' + say, bw - 16).slice(0, 3);
     R().round(ctx, x + 62, y + 32, bw, 12 + lines.length * 10, 5, P.ink);
     R().round(ctx, x + 63, y + 33, bw - 2, 10 + lines.length * 10, 4, '#fffaf0');

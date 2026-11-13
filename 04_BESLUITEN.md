@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-11-13 — Pakket B (handoff na review 2, volgorde HJ)
+
+| # | Besluit | Reden |
+|---|---|---|
+| 112 | **Weekklus (B1).** Vanaf week 4 (`CC.WEEKKLUS.from`) krijg je op zondag bij de kaartkeuze één klus voor de komende week, van Montenegro of Ronnie, naast de niveauklussen. De lat hangt aan wat je vorige week deed: flessen ×1,15 (min 40), flessen aan een klanttype ×1,25 (min 8), verschillende wijnen op één dag +1 (min 5, hooguit je aantal vakken). Beloning: geld (€60), reputatie (+20) of eenmalig 15% korting op je volgende bestelling (`s.orderDiscount`; Ronnie zegt het in het bestelvenster). De klus staat in goud bovenaan het klussenbord en vervalt na zaterdag. Keuze per seed en week vast (`SIM.planWeekKlus`), dus zondag en maandag tonen hetzelfde, ook na herladen. Drie voorbeeldklussen; Fable levert de lijst en de teksten. Week 1–3 blijven onveranderd. Bots doen er niets bewust voor; ze halen hem als het vanzelf lukt (alles 46%, advies 23%, slim 25%). Balans (150 runs): alles 82 · advies 61 · slim 47 · perfect 76 · mix 10 (vóór 83 · 59 · 43 · 75 · 9): binnen de ruis. Telt nog niet mee in de score. | Review: vanaf week 4 won "aanvullen en openen" zonder nadenken; er was geen doel meer tot week 8. |
+
+---
+
 ## 2026-11-12 — Pakket A na de tweede review (handoff `claude/10_HANDOFF_NA_REVIEW2.md`)
 
 Fouten en kleine dingen uit twee gespeelde runs van Fable. Geen getallen in `config.js` veranderd. Test: `tools/test_pakketA.js` (browser, bedient het spel met muisklikken en tikken op de klikvlakken).

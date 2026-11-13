@@ -540,6 +540,7 @@
   app.offerCards = function () {
     const s = app.s;
     if (s.status !== 'playing' && s.status !== 'endless') return;
+    SIM.offerWeekKlus(s);   // B1: klus voor volgende week (staat in de save)
     if (app.sunday.cards) return;   // al aangeboden (bijv. na herladen)
     app.sunday.cards = SIM.offerCards(s, CC.makeRng(s));
     app.sunday.chosen = null; app.sunday.cardMsg = null; app.sunday.t0 = app.t; app.sunday.chosenT = null;

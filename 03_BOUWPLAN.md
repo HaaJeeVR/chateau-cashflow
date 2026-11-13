@@ -46,6 +46,7 @@ Chateau Cashflow/
 │  ├─ test_intro.js    ← intro en feedbackknop in een echte browser (Playwright)
 │  ├─ test_fietser.js  ← fietser: hooguit eens per 30–60 s, nooit op een stoep met voetgangers, puur beeld
 │  ├─ test_pakketA.js  ← pakket A na review 2 in een echte browser (Playwright): bedient het spel met muisklikken en tikken op de klikvlakken
+│  ├─ test_pakketB.js  ← pakket B (weekklus, …) in een echte browser; VIEW=844x390 voor een andere schermmaat
 │  ├─ balance.js       ← headless simulatie (node), gebruikt src/sim.js  [M2]
 │  ├─ build_bg.py      ← achtergrond + lagen uit art_bronnen/ (ook vitrine en winkelfases)
 │  ├─ measure_planks.py ← plankposities in de kasten meten

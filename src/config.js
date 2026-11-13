@@ -122,6 +122,19 @@
   ];
   CC.upgradeById = id => CC.UPGRADES.find(u => u.id === id);
 
+  // Weekklus (B1, handoff na review 2): elke zondag één klus voor de komende week, naast de niveauklussen.
+  // De lat ligt net boven wat je vorige week deed (grow = factor, plus = extra), met een ondergrens (min).
+  // Beloning: cash (euro), rep (reputatie) of discount (eenmalige korting op je volgende bestelling).
+  // Drie voorbeeldklussen van bestaande typen; Fable levert de volledige lijst.
+  CC.WEEKKLUS = {
+    from: 4,   // eerste week met een weekklus (je krijgt hem op de zondag ervoor); week 1–3 blijven zoals ze zijn
+    list: [
+      { id: 'wk_flessen', giver: 'bankier', kind: 'bottles', grow: 1.15, min: 40, reward: { cash: 60 } },
+      { id: 'wk_type', giver: 'bankier', kind: 'type', grow: 1.25, min: 8, reward: { rep: 20 } },
+      { id: 'wk_variety', giver: 'ronnie', kind: 'variety', plus: 1, min: 5, reward: { discount: 0.15 } },
+    ],
+  };
+
   // Niveaus (besluit 76): per niveau één hoofdprijs en één bijprijs (thema), plus een klus die je die prijs leert gebruiken.
   // main/side verwijzen naar wat er op dat niveau vrijkomt (wijn / type / staff / upgrade); de vrijspeel-niveaus zelf staan
   // bij de wijnen, klanttypes, personeel en investeringen (tools/test_fase3.js controleert dat alles klopt).

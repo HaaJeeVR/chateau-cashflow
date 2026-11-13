@@ -39,7 +39,8 @@
   // ---------- Voorbereiden ----------
   // Inkoopprijs vandaag (kaart "Ronnie heeft een partij over": korting)
   SIM.buyPrice = function (s, w) {
-    let d = 0; for (const e of SIM.effects(s)) d = Math.max(d, e.discount || 0);
+    let d = s.orderDiscount || 0;   // B1: korting uit een weekklus, eenmalig (de grootste korting telt)
+    for (const e of SIM.effects(s)) d = Math.max(d, e.discount || 0);
     return Math.round(CC.wineCost(w) * (1 - d) * 100) / 100;
   };
   // Levert Ronnie vandaag? (tegenvaller "parkeerhandhaving")
@@ -513,6 +514,7 @@
     }
     s.targets = s.targets || {};
     for (const id in order) s.targets[id] = SIM.totalBottles(s, id);   // morgen stelt Ronnie voor aan te vullen tot hier
+    if (out.length && s.orderDiscount) s.orderDiscount = 0;   // B1: korting is gebruikt
     return { deliveries: out, short, cost: out.reduce((a, d) => a + d.cost, 0) };
   };
 
@@ -733,7 +735,55 @@
       out.push({ lvl: k.lvl, n: k.n, need: def.need, gained: c, now, rep: now ? def.rep || 0 : 0, cash: now ? def.cash || 0 : 0 });
     }
     s.klussen = s.klussen.filter(k => k.n < SIM.klusDef(k.lvl).need);
+    // B1: weekklus
+    const wk = SIM.weekKlusOpen(s);
+    if (wk) {
+      const def = SIM.weekKlusDef(wk.id), c = SIM.klusCount({ kind: def.kind, type: wk.type }, log, work);
+      wk.n = Math.min(wk.need, def.kind === 'variety' ? Math.max(wk.n, c) : wk.n + c);
+      const now = wk.n >= wk.need;
+      let r = {};
+      if (now) { wk.done = true; r = SIM.weekKlusReward(s, wk, log); }
+      out.push({ wk: wk.id, n: wk.n, need: wk.need, gained: c, now, rep: now ? r.rep || 0 : 0, cash: now ? r.cash || 0 : 0, discount: now ? r.discount || 0 : 0 });
+    }
     return out;
+  };
+  // ---------- Weekklus (B1) ----------
+  // Elke week vanaf CC.WEEKKLUS.from één klus, gekozen op de zondag ervoor. De lat hangt aan wat je vorige week deed,
+  // zodat hij op elk niveau iets vraagt. Deterministisch per seed en week: zondag (planning) en startWeek kiezen hetzelfde.
+  SIM.weekKlusDef = function (id) { return CC.WEEKKLUS.list.find(d => d.id === id) || null; };
+  SIM.planWeekKlus = function (s, week) {
+    const W = CC.WEEKKLUS;
+    if (week < W.from || week > C().repay.length || (s.status !== 'playing' && s.status !== 'won')) return null;
+    const last = s.history.filter(h => h.week === week - 1);
+    const rng = CC.makeRng({ rng: ((s.seed || 1) * 7919 + week * 104729) >>> 0 });
+    const types = Object.keys(CC.CUSTOMER_TYPES).filter(k => CC.CUSTOMER_TYPES[k].minLevel <= s.level && k !== 'buurt');
+    const vaks = SIM.activeVakIds(s).length;
+    const prevId = s.weekKlus && s.weekKlus.week === week - 1 ? s.weekKlus.id : null;
+    const ok = W.list.filter(d => d.id !== prevId && (d.kind !== 'type' || types.length) && (d.kind !== 'variety' || vaks >= d.min));
+    if (!ok.length) return null;
+    const d = ok[Math.floor(rng() * ok.length)], k = { id: d.id, week, n: 0, done: false };
+    const up5 = x => Math.ceil(x / 5) * 5;
+    if (d.kind === 'bottles') k.need = Math.max(d.min, up5(last.reduce((a, h) => a + (h.bottles || 0), 0) * d.grow));
+    if (d.kind === 'type') {
+      k.type = types[Math.floor(rng() * types.length)];
+      k.need = Math.max(d.min, Math.ceil(last.reduce((a, h) => a + (((h.types || {})[k.type] || {}).bottles || 0), 0) * d.grow));
+    }
+    if (d.kind === 'variety') k.need = Math.min(vaks, Math.max(d.min, Math.max(0, ...last.map(h => Object.keys(h.wines || {}).filter(id => h.wines[id].sold > 0).length)) + (d.plus || 0)));
+    return k;
+  };
+  // Zondag: de klus voor volgende week vastleggen (staat in de save, zodat herladen hetzelfde laat zien)
+  SIM.offerWeekKlus = function (s) {
+    if (!s.nextWeekKlus || s.nextWeekKlus.week !== s.week + 1) s.nextWeekKlus = SIM.planWeekKlus(s, s.week + 1);
+    return s.nextWeekKlus;
+  };
+  SIM.weekKlusOpen = function (s) { const k = s.weekKlus; return k && k.week === s.week && !k.done ? k : null; };
+  SIM.weekKlusReward = function (s, k, log) {
+    const r = SIM.weekKlusDef(k.id).reward;
+    if (r.cash) s.cash += r.cash;
+    if (r.rep) { s.rep += r.rep; if (log) { log.rep = (log.rep || 0) + r.rep; const rp = log.repParts = log.repParts || {}; rp.klus = (rp.klus || 0) + r.rep; } }
+    if (r.discount) s.orderDiscount = Math.max(s.orderDiscount || 0, r.discount);
+    s.weekKlusDone = (s.weekKlusDone || 0) + 1;
+    return r;
   };
   SIM.klusAdd = function (s, from, to) { SIM.klusOpen(s); for (let L = from; L <= to; L++) if (SIM.klusDef(L)) s.klussen.push({ lvl: L, n: 0 }); };
 
@@ -845,6 +895,9 @@
   };
   SIM.startWeek = function (s) {
     s.week++; s.day = 0; s.weekBought = {}; s.sun = null;
+    // B1: weekklus van deze week (zoals zondag aangekondigd; anders nu kiezen)
+    const nk = s.nextWeekKlus && s.nextWeekKlus.week === s.week ? s.nextWeekKlus : SIM.planWeekKlus(s, s.week);
+    s.weekKlus = nk; s.nextWeekKlus = null;
     SIM.rollMishap(s, CC.makeRng(s));
     // A7: naar vrij spelen: de weekkaart van week 8 is voorbij en mag niet als oude kaart blijven hangen
     if (s.status === 'won') { s.status = 'endless'; if (s.card && s.card.week < s.week) s.card = null; }
