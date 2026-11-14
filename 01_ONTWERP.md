@@ -65,16 +65,15 @@ Een eerste ruwe simulatie met deze waarden gaf precies dit patroon (goedkoop 6%,
 
 ### Prijzen
 
-Geen vrij prijsveld. Per wijn kies je één van vier **prijsstanden** ten opzichte van de inkoopprijs:
+Geen vrij prijsveld. Per wijn kies je één van drie **prijsstanden** ten opzichte van de inkoopprijs (besluit 122, `claude/14_PRIJZEN.md`):
 
 | Stand | Factor | Effect |
 |---|---|---|
-| Scherp | ×1,3 | meer kopers, weinig marge |
-| Normaal | ×1,6 | de "adviesprijs" |
-| Stevig | ×2,0 | minder kopers, prijsbewuste klanten haken af |
-| Woeker | ×2,6 | alleen voor snobs en schaarste; reputatie −1 per verkoop |
+| Aanbieding | ×1,3 | één wijn tegelijk; trekt die dag extra klanten (vooral koopjesjagers en buurtbewoners), die ook naar je andere flessen kijken |
+| Normaal | ×1,6 | het uitgangspunt |
+| Stevig | ×2,0 | meer marge bij liefhebbers en statuszoekers; buurtbewoners en koopjesjagers haken af |
 
-Vier knoppen, direct begrijpelijk. **Let op (besluit 45):** in de huidige regels is "normaal" vrijwel altijd beter en is "scherp" een val; de functie van scherp staat open.
+"Woeker" bestaat niet meer. Het prijsvenster toont per stand per klanttype of hij de wijn nog wil (koopt · twijfelt · haakt af), en het avondinzicht rekent na wat één andere stand had opgeleverd.
 
 ---
 
@@ -223,18 +222,17 @@ is die uitverkocht: 50% kans dat hij de beste andere wijn neemt (als die > 3,5),
 
 Aantal flessen: 1 (50%), 2 (33%), 3 (17%).
 
-Gewichten (startwaarden in `config.js`): buurtbewoner w_pop 0,8 · w_prest 0,2 · prijsgevoel 1,0 — koopjesjager 0,6 · 0 · 1,8 — liefhebber 0,5 · 0,9 · 0,6 — statuszoeker 0,1 · 1,4 · 0,2.
+Gewichten (startwaarden in `config.js`): buurtbewoner w_pop 0,8 · w_prest 0,2 · prijsgevoel 2,2 — koopjesjager 0,6 · 0 · 3,0 — liefhebber 0,5 · 0,9 · 0,6 — statuszoeker 0,1 · 1,4 · 0,2 (prijsgevoel van buurtbewoner en koopjesjager omhoog in besluit 122). Onder normaal telt de prijs maar voor 30% mee (`offerAppeal`).
 
-Gemeten met 4 startwijnen (alle op dezelfde stand):
+Gemeten met 4 startwijnen (alle op dezelfde stand; meting van vóór besluit 122, ter illustratie):
 
 | Stand | Buurtbewoner koopt | Koopjesjager koopt |
 |---|---|---|
 | Scherp | 100% | 84% |
 | Normaal | 98% | 45% |
 | Stevig | 61% | 0% |
-| Woeker | 0% | 0% |
 
-Geen stand is overal het beste: "normaal" wint gemiddeld, maar per wijn en klantmix loont afwijken.
+Geen stand is overal het beste: stevig loont op de wijnen voor liefhebbers en statuszoekers, de aanbieding op een populaire wijn die niet je bestseller is, en normaal blijft voor de rest het goede antwoord (meting: `node tools/prijzen.js`).
 
 ### Leesbare reacties (gedachteballonnetjes)
 
@@ -285,7 +283,7 @@ Pool: ± 40 vragen in de MVP, geschreven in de toon van §1.
 
 ## 8. Reputatie, niveaus en klussen (besluit 76)
 
-Reputatie (Rep) is de ruggengraat. Verdienen: +1 per verkoop, +1 extra bij prestige ≥3, +1 bij goed advies, bonus voor een gehaalde klus. Verliezen: −2 per verkoop tegen woekerprijs, fout advies. Je ziet het gebeuren: "+1 ★" boven een klant die afrekent, en in het dagrapport de uitsplitsing ("verkoop +25 · prestige +9 · advies +1 · klus +15").
+Reputatie (Rep) is de ruggengraat. Verdienen: +1 per verkoop, +1 extra bij prestige ≥3, +1 bij goed advies, bonus voor een gehaalde klus. Verliezen: fout advies (de woekerstraf is weg met de stand zelf, besluit 122). Je ziet het gebeuren: "+1 ★" boven een klant die afrekent, en in het dagrapport de uitsplitsing ("verkoop +25 · prestige +9 · advies +1 · klus +15").
 
 Elk niveau geeft **twee nieuwe dingen** onder één thema (even groot getoond, geen rangorde: de speler ziet zelf wat het zwaarst weegt), +3 klanten per dag, en **een klus** die je leert gebruiken wat je net kreeg.
 

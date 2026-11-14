@@ -21,7 +21,7 @@ const WISE = +(process.env.WISE || 0.5);   // investeren alleen met een buffer v
 if (process.env.UPC) { const u = JSON.parse(process.env.UPC); for (const k in u) CC.upgradeById(k).cost = u[k]; }
 if (process.env.UPB) { const u = JSON.parse(process.env.UPB); for (const k in u) Object.assign(CC.upgradeById(k), u[k]); }
 if (process.env.REPAY) C.repay = process.env.REPAY.split(',').map(Number);
-if (process.argv[3]) Object.assign(C, JSON.parse(process.argv[3]));   // tunen zonder config te wijzigen
+if (process.argv[3]) { const o = JSON.parse(process.argv[3]); const types = o.types; delete o.types; Object.assign(C, o); for (const k in types || {}) Object.assign(CC.CUSTOMER_TYPES[k], types[k]); }   // tunen zonder config te wijzigen ({"types": {...}} voor klanttypes)
 
 const byScore = ws => ws.sort((a, b) => score(b) - score(a));
 // slim assortiment: de beste wijnen plus genoeg betaalbare voor buurtbewoners en koopjesjagers. Hoeveel? Dat leest de bot
@@ -47,11 +47,11 @@ function expDay(s, wines, plan, stand) {
     const t = CC.CUSTOMER_TYPES[cu.type]; let best = null;
     for (const w of wines) {
       if (S.blocked(s, w)) continue;
-      const role = CC.roleById(w.role), st = CC.standById(stand(w)), price = CC.priceFor(w, st.id);
+      const role = CC.roleById(w.role), st = CC.standById(stand(w, s)), price = CC.priceFor(w, st.id);
       if (price > S.budgetOf(s, cu)) continue;
       const likes = (t.likes || []).some(x => (w.stijl || []).includes(x));
       const sc = role.pop * t.wPop + role.prest * t.wPrest + (likes ? c.prefBonus : 0) + S.duboisPush(s, t, role) + S.cardBonus(s, w) + S.upgradeBonus(s, w)
-        - t.sens * (st.factor - 1.6) * c.pricePenaltyMul - (t.distrustBelow && price < t.distrustBelow ? 3 : 0);
+        - S.pricePenalty(t, st.factor) - (t.distrustBelow && price < t.distrustBelow ? 3 : 0);
       if (!best || sc > best.sc) best = { sc, w, price, role };
     }
     // kans dat hij koopt: ruis ±noise rond de drempel
@@ -75,26 +75,52 @@ const planPick = (ws, slots, s, stand) => {
   }
   return chosen;
 };
-const stevig = w => (CC.roleById(w.role).pop >= 5 ? 'stevig' : 'normaal');
+// 14_PRIJZEN: stevig op de juiste wijnen = wat liefhebbers en statuszoekers kopen (prestige 3+ of een stevige rode,
+// vanaf niveau 3); de rest normaal.
+// (Tot 14_PRIJZEN: stevig op de populairste wijn, pop 5; met de nieuwe prijsgevoeligheid kost dat juist klanten.)
+const stevig = (w, s) => ((!s || s.level >= 3) && (CC.roleById(w.role).prest >= 3 || (w.stijl || []).includes('stevig')) ? 'stevig' : 'normaal');   // vanaf de liefhebbers: prestige 3+ of een stevige rode
+const normaal = () => 'normaal';
+const alleStevig = () => 'stevig';
+// Aanbieding kiezen. heur = wat een oplettende speler doet: een populaire wijn (pop 3+) die niet de bestseller
+// van gisteren is en geen stevige prijs heeft, de duurste daarvan. oracle = elke ochtend de dag naspelen per kandidaat.
+function pickOffer(s, wines, how, lastSold) {
+  if (!how) return null;
+  if (how === 'heur') {
+    const top = Object.keys(lastSold || {}).sort((a, b) => lastSold[b] - lastSold[a])[0];
+    const c = wines.filter(w => CC.roleById(w.role).pop >= 3 && s.prices[w.id] === 'normaal' && w.id !== top && S.onShelf(s, w.id) > 0)
+      .sort((a, b) => CC.roleById(b.role).pop - CC.roleById(a.role).pop || CC.wineCost(b) - CC.wineCost(a));
+    return c[0] ? c[0].id : null;
+  }
+  // oracle
+  const run1 = id => { const t = JSON.parse(JSON.stringify(s)); if (id) S.setPrice(t, id, 'aanbieding'); const d = DAY.start(t); DAY.finish(d, t); return d.log.revenue - d.log.cogs; };
+  let best = { id: null, v: run1(null) };
+  for (const w of wines) { if (s.prices[w.id] !== 'normaal' || S.onShelf(s, w.id) <= 0) continue; const v = run1(w.id); if (v > best.v) best = { id: w.id, v }; }
+  return best.id;
+}
 const BOTS = {
   goedkoop: { pick: ws => ws.filter(w => CC.wineCost(w) <= 6).sort((a, b) => CC.wineCost(a) - CC.wineCost(b)), stand: () => 'normaal', restock: 'vast' },
   // duur: alleen wijnen vanaf €8 inkoop zodra er minstens twee zijn; tot dan het duurste wat er is
   duur:     { pick: ws => { const d = ws.filter(w => CC.wineCost(w) >= 8); return (d.length >= 2 ? d : ws).sort((a, b) => CC.wineCost(b) - CC.wineCost(a)); }, stand: () => 'normaal', restock: 'vast' },
   // mix: verstandig assortiment, maar accepteert elke ochtend gewoon Ronnies voorstel (na dag 1: aanvullen tot 12)
   mix:      { pick: byScore, stand: () => 'normaal', restock: 'vast' },
-  slim:     { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim' },
-  advies:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0.8 },
-  perfect:  { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 1.0 },
-  gokker:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0.4 },
+  slim:     { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim' },
+  advies:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 0.8 },
+  perfect:  { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 1.0 },
+  gokker:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 0.4 },
   // personeel: neemt aan zodra het kan (max staffMax), naast de advies-bot
-  sem:      { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0.8, hire: ['sem'] },
-  fatima:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0.8, hire: ['fatima'] },
-  dubois:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0, hire: ['dubois'] },
-  team:     { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0.8, hire: ['fatima', 'sem'] },
+  sem:      { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 0.8, hire: ['sem'] },
+  fatima:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 0.8, hire: ['fatima'] },
+  dubois:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 0, hire: ['dubois'] },
+  team:     { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 0.8, hire: ['fatima', 'sem'] },
   // investeren (besluit 60): koopt upgrades als de kas het toelaat. = "goede speler die investeert" (doel 75–80%)
-  invest:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0.8, invest: true },
-  alles:    { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0.8, invest: true, hire: ['fatima', 'sem'] },
-  koopgraag: { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0.8, invest: true, investAll: true },
+  invest:   { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 0.8, invest: true },
+  alles:    { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 0.8, invest: true, hire: ['fatima', 'sem'] },
+  // 14_PRIJZEN §4: drie prijsgedragingen naast elkaar (verder gelijk aan alles)
+  nooit:    { pick: (ws, n, s) => planPick(ws, n, s, normaal), stand: normaal, restock: 'slim', advice: 0.8, invest: true, hire: ['fatima', 'sem'] },
+  aanbod:   { pick: (ws, n, s) => planPick(ws, n, s, normaal), stand: normaal, offer: 'oracle', restock: 'slim', advice: 0.8, invest: true, hire: ['fatima', 'sem'] },
+  gericht:  { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, restock: 'slim', advice: 0.8, invest: true, hire: ['fatima', 'sem'] },
+  stevigal: { pick: (ws, n, s) => planPick(ws, n, s, alleStevig), stand: alleStevig, restock: 'slim', advice: 0.8, invest: true, hire: ['fatima', 'sem'] },
+  koopgraag: { pick: (ws, n, s) => planPick(ws, n, s, stevig), stand: stevig, offer: 'heur', restock: 'slim', advice: 0.8, invest: true, investAll: true },
   lui:      { lazy: true },
 };
 function score(w) { const r = CC.roleById(w.role); return r.pop + r.prest + CC.wineCost(w) / 10; }
@@ -191,7 +217,8 @@ function botDay(s, bot, lastSold, e) {
     if (kd.kind === 'variety') for (const w of byScore(S.unlockedWines(s).slice())) if (wines.length < vaks.length && !wines.includes(w)) wines.push(w);
   }
   vaks.forEach((v, i) => { const w = wines[i]; if (w && s.vakken[v].wine !== w.id) S.assignVak(s, v, w.id); });
-  for (const w of wines) S.setPrice(s, w.id, bot.stand(w));
+  for (const w of wines) S.setPrice(s, w.id, bot.stand(w, s));
+  if (bot.offer) { const of = pickOffer(s, wines, process.env.NOOFFER ? null : bot.offer, lastSold); if (of) S.setPrice(s, of, 'aanbieding'); }
   // reserve voor de zondag: aflossing + huur en loon tot en met zaterdag, min wat de rest van de week (voorzichtig) oplevert
   const daysLeft = C.daysPerWeek - s.day;
   const reserve = Math.max(0, due + S.costsLeft(s) - daysLeft * e.mpd * 0.75);

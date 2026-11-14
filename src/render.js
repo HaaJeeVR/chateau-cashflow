@@ -743,6 +743,19 @@
     ctx.restore();
   };
 
+  // 14_PRIJZEN §2.2: de aanbiedingsfles. Op het stoepbord zodra dat er staat (niveau 3), anders vooraan op de
+  // presentatietafel. Met een kaartje met een procentteken (UI.offerTag); geen andere tekst in de wereld.
+  R.OFFER_SPOT = { board: { x: 471, y: 306, tag: [476, 290] }, table: { x: 290, y: 210, tag: [295, 196] } };   // bord: de fles staat vóór het bord op de stoep
+  R.offerOnBoard = function (s) { const f = CC.FURNITURE.find(ff => ff.id === 'decor_stoepbord'); return !!(f && s.level >= (f.level || 0)); };
+  R.offerBottle = function (ctx, s, where, t) {
+    const id = CC.SIM.offerWine(s); if (!id) return;
+    if ((where === 'board') !== R.offerOnBoard(s)) return;
+    const sp = R.OFFER_SPOT[where], w = CC.wineById(id);
+    if (!R.wineSprite(ctx, w, 'icoon', sp.x, sp.y)) R.bottleMid(ctx, sp.x, sp.y - 10, w);
+    const bob = Math.round(Math.sin((t || 0) * 2.2));   // kaartje wiebelt even
+    if (CC.UI && CC.UI.offerTag) CC.UI.offerTag(ctx, sp.tag[0], sp.tag[1] + bob);
+  };
+
   // Achtergrond of laag tekenen (alleen het schemerbeeld; de dagversie is geschrapt, besluit 56/85)
   R.drawLayer = function (ctx, images, key, pos) {
     const im = images[key];

@@ -271,7 +271,7 @@
             // reputatie (besluit 76) staat in hetzelfde label: "+€13  +1 ★" (los boven de klant botste het met het bedrag)
             const dr = d.log.lastRep || 0;
             d.floats.push({ cash: true, text: '+' + CC.R.euro(rev), rep: dr, x: RM.counter.x - 0.7, y: RM.counter.y - 0.7, t: 1.6, max: 1.6, stack, col: CC.PAL.gold2 });
-            if (d.rng() < 0.25) say(c, CC.pickText(T.bought, d.rng), 'green', 1.8);
+            if (d.rng() < (c.want && c.want.offer ? 0.45 : 0.25)) say(c, CC.pickText(c.want && c.want.offer ? T.offerBought : T.bought, d.rng), 'green', 1.8);   // 14_PRIJZEN: eigen zinnen bij de aanbieding
             c.carry = null; c.bag = true;
             leave(c);
           }
@@ -403,6 +403,38 @@
   DAY.finish = function (d, s) {
     let guard = 0; d.speed = 1;
     while (!d.done && guard++ < 60 * 120) DAY.step(d, s, DAY.STEP);
+  };
+
+  // 14_PRIJZEN §3.2: wat als? Speel de dag opnieuw vanaf de beginstand (snap) met dezelfde klanten en dezelfde
+  // toevalsreeks, per wijn één stand hoger en één lager. Basis = dezelfde dag met jouw prijzen, ook nagespeeld (zonder
+  // jouw adviesklikken), zodat het verschil alleen de prijs is. Geeft de wijn met het grootste verschil, alleen als dat
+  // minstens CONFIG.whatIfMin van de dagmarge is; anders { none: true }.
+  DAY.replay = function (snap, wineId, standId) {
+    const t = JSON.parse(JSON.stringify(snap));
+    if (wineId) SIM().setPrice(t, wineId, standId);
+    const d = DAY.start(t); DAY.finish(d, t);
+    return { margin: d.log.revenue - d.log.cogs, customers: d.log.customers, buyers: d.log.buyers };
+  };
+  DAY.whatIf = function (snap) {
+    const S = SIM(), order = CC.CONFIG.priceStands.map(x => x.id);
+    const base = DAY.replay(snap);
+    let best = null;
+    const seen = new Set();
+    for (const L of S.listed(snap)) {
+      const id = L.wine.id; if (seen.has(id)) continue; seen.add(id);
+      const i = order.indexOf(snap.prices[id]);
+      for (const j of [i - 1, i + 1]) {
+        if (j < 0 || j >= order.length) continue;
+        const alt = DAY.replay(snap, id, order[j]);
+        const diff = alt.margin - base.margin;
+        const moved = order[j] === 'aanbieding' ? Object.keys(snap.prices).find(k => k !== id && snap.prices[k] === 'aanbieding') || null : null;
+        if (!best || diff > best.diff) best = { wine: id, from: snap.prices[id], to: order[j], diff, extra: alt.customers - base.customers, moved };
+      }
+    }
+    const min = Math.max(CC.CONFIG.whatIfMinEuro || 0, (CC.CONFIG.whatIfMin || 0.1) * Math.max(0, base.margin));
+    if (!best || best.diff < min) return { none: true, base: Math.round(base.margin) };
+    best.diff = Math.round(best.diff); best.base = Math.round(base.margin);
+    return best;
   };
 
   CC.DAY = DAY;

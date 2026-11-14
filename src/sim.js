@@ -88,7 +88,26 @@
     }
   };
 
-  SIM.setPrice = function (s, wineId, standId) { s.prices[wineId] = standId; };
+  // 14_PRIJZEN: aanbieding = één wijn tegelijk; kies je een tweede, dan gaat de eerste terug naar normaal
+  SIM.setPrice = function (s, wineId, standId) {
+    if (standId === 'aanbieding') for (const k in s.prices) if (k !== wineId && s.prices[k] === 'aanbieding') s.prices[k] = 'normaal';
+    s.prices[wineId] = standId;
+  };
+  // De wijn in de aanbieding, alleen als hij vanochtend op het schap staat (anders trekt hij niemand)
+  SIM.offerWine = function (s) {
+    const id = Object.keys(s.prices).find(k => s.prices[k] === 'aanbieding');
+    if (!id) return null;
+    const L = SIM.listed(s).find(l => l.wine.id === id);
+    return L && L.n > 0 ? id : null;
+  };
+  // rng (optioneel): de rest achter de komma wordt met kans afgerond, zodat kleine stappen in perPop meetellen
+  SIM.offerCustomers = function (s, rng) {
+    const id = SIM.offerWine(s); if (!id) return 0;
+    // pop × perPop, meegroeiend met de gewone loop van je niveau (een grotere winkel heeft meer bereik)
+    const c = C(), reach = (c.customersBase + c.customersPerLevel * (s.level - 1)) / c.customersBase;
+    const x = CC.roleById(CC.wineById(id).role).pop * c.offer.perPop * Math.min(c.offer.reachCap || 9, Math.pow(reach, c.offer.scale || 0));
+    return Math.max(0, rng ? Math.floor(x) + (rng() < x - Math.floor(x) ? 1 : 0) : Math.round(x));
+  };
 
   SIM.totalBottles = function (s, wineId) { return (s.stock[wineId] || 0) + SIM.onShelf(s, wineId); };
 
@@ -100,10 +119,10 @@
     const c = C();
     const j = Math.round((rng() * 2 - 1) * c.customersJitter);
     const semLv = SIM.staffLevel ? SIM.staffLevel(s, 'sem') : 0;
-    const sem = semLv ? c.semCustomers[semLv - 1] : 0, upg = SIM.upgradeCustomers(s), rep = SIM.repCustomers(s);
-    const raw = Math.max(1, c.customersBase + c.customersPerLevel * (s.level - 1) + j + sem + upg + rep);
+    const sem = semLv ? c.semCustomers[semLv - 1] : 0, upg = SIM.upgradeCustomers(s), rep = SIM.repCustomers(s), offer = SIM.offerCustomers(s, rng);
+    const raw = Math.max(1, c.customersBase + c.customersPerLevel * (s.level - 1) + j + sem + upg + rep + offer);
     const n = SIM.cardCustomers(s, raw), k = raw ? n / raw : 0;
-    return { n, sem: Math.round(sem * k), upg: Math.round(upg * k), rep: Math.round(rep * k) };
+    return { n, sem: Math.round(sem * k), upg: Math.round(upg * k), rep: Math.round(rep * k), offer: Math.round(offer * k) };
   };
   // B4: reputatie blijft tellen na niveau 8: elke repBonus.step boven de drempel van niveau 8 = +1 klant per dag
   SIM.repBonus = function (s) {
@@ -114,6 +133,19 @@
   };
   SIM.repCustomers = function (s) { return SIM.repBonus(s).n; };
 
+  // 14_PRIJZEN: wie komt voor de aanbieding? Vooral koopjesjagers en buurtbewoners (CONFIG.offer.types)
+  SIM.offerReach = function (s, wineId) {
+    const c = C(), reach = (c.customersBase + c.customersPerLevel * (s.level - 1)) / c.customersBase;
+    return CC.roleById(CC.wineById(wineId).role).pop * c.offer.perPop * Math.min(c.offer.reachCap || 9, Math.pow(reach, c.offer.scale || 0));
+  };
+  SIM.pickOfferType = function (s, rng) {
+    const O = C().offer;
+    if (O.other && rng() < O.other) return SIM.pickType(s, rng);   // een deel is gewoon nieuwsgierig
+    const T = O.types, ks = Object.keys(T).filter(k => CC.CUSTOMER_TYPES[k].minLevel <= s.level);
+    const tot = ks.reduce((a, k) => a + T[k], 0); let r = rng() * tot;
+    for (const k of ks) { r -= T[k]; if (r <= 0) return k; }
+    return ks[ks.length - 1];
+  };
   SIM.pickType = function (s, rng) {
     const types = Object.keys(CC.CUSTOMER_TYPES).filter(k => CC.CUSTOMER_TYPES[k].minLevel <= s.level);
     const wt = k => CC.CUSTOMER_TYPES[k].weight * SIM.typeMul(s, k);
@@ -130,18 +162,18 @@
     const plan = SIM.planDay(s, SIM.dayRng(s));
     const counts = {};
     for (const p of plan) counts[p.type] = (counts[p.type] || 0) + 1;
-    const rep = plan.filter(p => p.src === 'rep').length;
-    return { total: plan.length, counts, rep };
+    const rep = plan.filter(p => p.src === 'rep').length, offer = plan.filter(p => p.src === 'offer').length;
+    return { total: plan.length, counts, rep, offer, offerWine: offer ? SIM.offerWine(s) : null };
   };
 
   SIM.planDay = function (s, rng) {
     const parts = SIM.customerParts(s, rng), n = parts.n;
     // extra klanten (Sem, investeringen) gelijkmatig over de dag verdelen
-    const src = {}, extra = Math.min(n, parts.sem + parts.upg + parts.rep);
-    for (let e = 0; e < extra; e++) src[Math.min(n - 1, Math.floor((e + 0.5) * n / extra))] = e < parts.sem ? 'sem' : e < parts.sem + parts.upg ? 'upg' : 'rep';
+    const src = {}, extra = Math.min(n, parts.sem + parts.upg + parts.rep + parts.offer);
+    for (let e = 0; e < extra; e++) src[Math.min(n - 1, Math.floor((e + 0.5) * n / extra))] = e < parts.sem ? 'sem' : e < parts.sem + parts.upg ? 'upg' : e < parts.sem + parts.upg + parts.rep ? 'rep' : 'offer';
     const list = [];
     for (let i = 0; i < n; i++) {
-      const type = SIM.pickType(s, rng);
+      const type = src[i] === 'offer' ? SIM.pickOfferType(s, rng) : SIM.pickType(s, rng);
       const t = CC.CUSTOMER_TYPES[type];
       const budget = t.budget[0] + rng() * (t.budget[1] - t.budget[0]);
       const at = (i + rng() * 0.8) * (C().spawnWindow / n);
@@ -151,6 +183,41 @@
     return list;
   };
 
+  // Prijs in de score (01_ONTWERP §6): boven normaal kost het sens × (factor − 1,6) × pricePenaltyMul;
+  // onder normaal (aanbieding) maakt het de wijn aantrekkelijker, met offerAppeal als demper (14_PRIJZEN).
+  SIM.pricePenalty = function (t, factor) {
+    const d = (factor - 1.6) * C().pricePenaltyMul * t.sens;
+    return d < 0 ? d * C().offerAppeal : d;
+  };
+  // 14_PRIJZEN §3.1: wie koopt dit nog? Zelfde formule als SIM.decide, zonder de ruis: de kans dat een klant van
+  // dit type de wijn bij deze stand wil hebben (budget én score boven de drempel). Concurrentie van je andere wijnen
+  // telt niet mee: het gaat om de vraag of hij afhaakt op déze prijs.
+  // Geeft { verdict: 'koopt'|'twijfelt'|'haakt', p, budget (deel dat kan betalen), why, n (vandaag verwacht) }.
+  SIM.priceVerdict = function (s, w, standId, type, plan) {
+    const c = C(), t = CC.CUSTOMER_TYPES[type], role = CC.roleById(w.role), stand = CC.standById(standId);
+    const price = CC.priceFor(w, standId);
+    const cs = (plan || []).filter(p => p.type === type);
+    let budget;
+    if (cs.length) budget = cs.filter(p => SIM.budgetOf(s, p) >= price).length / cs.length;
+    else { const [a, b] = t.budget, mul = SIM.budgetOf(s, { type, budget: 1 }); budget = Math.max(0, Math.min(1, (b * mul - price) / Math.max(0.01, (b - a) * mul))); }
+    const likes = (t.likes || []).some(st => (w.stijl || []).includes(st));
+    const distrust = !!(t.distrustBelow && price < t.distrustBelow);
+    const pen = SIM.pricePenalty(t, stand.factor);
+    const sc = role.pop * t.wPop + role.prest * t.wPrest + (likes ? c.prefBonus : 0) + SIM.duboisPush(s, t, role) + SIM.cardBonus(s, w) + SIM.upgradeBonus(s, w) - pen - (distrust ? 3 : 0);
+    const pScore = Math.max(0, Math.min(1, (sc - c.buyThreshold + c.noise) / (2 * c.noise)));
+    const p = budget * pScore;
+    const verdict = p >= 0.45 ? 'koopt' : p >= 0.15 ? 'twijfelt' : 'haakt';
+    // waarom (voor de tooltip): het zwaarste bezwaar
+    let why = null;
+    if (verdict !== 'koopt') {
+      if (budget < 0.5) why = 'budget';
+      else if (distrust) why = 'distrust';
+      else if (pen > 0.5 && sc + pen - c.buyThreshold + c.noise > 0 && pScore < 0.45) why = 'price';
+      else why = 'taste';
+    }
+    return { verdict, p, budget, why, n: cs.length, price };
+  };
+  SIM.decideHook = null;   // tools/test_prijzen.js: kijkt mee bij elke klantbeslissing
   // Klantbeslissing (01_ONTWERP §6). Geeft ook de afweging terug voor het debuglog.
   SIM.decide = function (s, cust, rng) {
     const c = C();
@@ -164,9 +231,10 @@
       const price = CC.priceFor(w, stand.id);
       const likes = (t.likes || []).some(st => (w.stijl || []).includes(st));
       const base = role.pop * t.wPop + role.prest * t.wPrest + (likes ? c.prefBonus : 0) + (rng() * 2 - 1) * c.noise + SIM.duboisPush(s, t, role) + SIM.cardBonus(s, w) + SIM.upgradeBonus(s, w);
-      const penalty = t.sens * (stand.factor - 1.6) * c.pricePenaltyMul + (t.distrustBelow && price < t.distrustBelow ? 3 : 0);
+      const penalty = SIM.pricePenalty(t, stand.factor) + (t.distrustBelow && price < t.distrustBelow ? 3 : 0);
       scored.push({ wine: w, price, base, score: base - penalty, affordable: price <= SIM.budgetOf(s, cust), n: SIM.onShelf(s, w.id) });
     }
+    if (SIM.decideHook) SIM.decideHook(s, cust, scored);
     const log = scored.map(x => `${x.wine.name} €${x.price} s=${x.score.toFixed(1)}${x.affordable ? '' : ' (budget)'}`);
     if (!scored.length) return { action: 'leave', reason: 'nothing', log };
     const affordable = scored.filter(x => x.affordable);
@@ -189,7 +257,10 @@
     // aantal flessen
     let r = rng() * c.qtyWeights.reduce((a, q) => a + q[1], 0); let qty = 1;
     for (const [q, wt] of c.qtyWeights) { r -= wt; if (r <= 0) { qty = q; break; } }
-    return { action: 'buy', wineId: pick.wine.id, qty, price: pick.price, missed, log };
+    // 14_PRIJZEN: wie de aanbieding koopt, neemt soms een fles extra ("Aanbieding? Dan neem ik er twee.")
+    const offer = s.prices[pick.wine.id] === 'aanbieding';
+    if (offer && c.offer.extraQty && qty < 3 && rng() < c.offer.extraQty) qty++;
+    return { action: 'buy', wineId: pick.wine.id, qty, price: pick.price, missed, offer, log };
   };
 
   // Flessen uit het schap pakken (kan minder zijn als iemand anders net was).
@@ -225,15 +296,15 @@
     const t = type && CC.CUSTOMER_TYPES[type];
     if (t && SIM.duboisPush(s, t, CC.roleById(w.role)) > 0) { log.duboisPush = (log.duboisPush || 0) + qty; log.duboisMargin = (log.duboisMargin || 0) + mg; }
     s.cash += rev;
-    // reputatie: per verkoop, bonus voor prestige, straf voor woeker
-    const pSale = C().repPerSale, pPrest = CC.roleById(w.role).prest >= 3 ? C().repPrestigeBonus : 0, pWoeker = s.prices[wineId] === 'woeker' ? C().repWoeker : 0;
-    let dr = pSale + pPrest + pWoeker;
+    // reputatie: per verkoop, bonus voor prestige
+    const pSale = C().repPerSale, pPrest = CC.roleById(w.role).prest >= 3 ? C().repPrestigeBonus : 0;
+    let dr = pSale + pPrest;
     const mul = dr > 0 ? SIM.repMul(s) : 1;   // proeverij, buurtapp
     dr *= mul;
     s.rep = Math.max(0, s.rep + dr); log.rep = (log.rep || 0) + dr;
     // uitsplitsing voor het dagrapport (besluit 76): waar komt je reputatie vandaan?
     const rp = log.repParts = log.repParts || {};
-    rp.sale = (rp.sale || 0) + pSale * mul; if (pPrest) rp.prestige = (rp.prestige || 0) + pPrest * mul; if (pWoeker) rp.woeker = (rp.woeker || 0) + pWoeker * mul;
+    rp.sale = (rp.sale || 0) + pSale * mul; if (pPrest) rp.prestige = (rp.prestige || 0) + pPrest * mul;
     log.lastRep = dr;
     if (log.types && type) tStat(log, type).bottles += qty;
     log.revenue += rev; log.cogs += qty * CC.wineCost(w); log.bottles += qty; log.buyers++;
@@ -401,10 +472,11 @@
       const w = L.wine, role = CC.roleById(w.role), price = SIM.price(s, w.id);
       if (price > SIM.budgetOf(s, cust)) continue;
       const likes = (t.likes || []).some(st => (w.stijl || []).includes(st));
-      const sc = role.pop * t.wPop + role.prest * t.wPrest + (likes ? C().prefBonus : 0) - t.sens * (CC.standById(s.prices[w.id]).factor - 1.6) * C().pricePenaltyMul;
+      const sc = role.pop * t.wPop + role.prest * t.wPrest + (likes ? C().prefBonus : 0) - SIM.pricePenalty(t, CC.standById(s.prices[w.id]).factor) + (t.distrustBelow && price < t.distrustBelow ? -3 : 0);
       if (!best || sc > best.sc) best = { w, price, sc };
     }
-    if (!best) return null;
+    // 14_PRIJZEN: Fatima praat je over een kleine drempel heen, niet over een prijs die je echt te gek vindt
+    if (!best || best.sc < C().buyThreshold - C().fatimaReach) return null;
     // Fatima verkoopt een gewone aankoop (1–3 flessen), geen troostfles (besluit 72)
     let r = rng() * C().qtyWeights.reduce((a, q) => a + q[1], 0), qty = 1;
     for (const [q, wt] of C().qtyWeights) { r -= wt; if (r <= 0) { qty = q; break; } }
@@ -697,7 +769,12 @@
       const w = CC.wineById(id); if (!w) continue;
       const unit = CC.priceFor(w, stands[id] || 'normaal') - CC.wineCost(w);
       if (W[id].soldOut >= 2) cands.push({ key: 'soldOut', wine: id, n: W[id].soldOut, tab: 'order', loss: W[id].soldOut * q * unit * 0.5 });   // de helft pakt een tweede keus
-      if (W[id].tooExpensive >= 2) cands.push({ key: 'tooExpensive', wine: id, n: W[id].tooExpensive, tab: 'prices', stand: stands[id] || 'normaal', price: CC.priceFor(w, stands[id] || 'normaal'), loss: W[id].tooExpensive * q * CC.wineCost(w) * 0.6 * 0.6 });
+    }
+    // 14_PRIJZEN §3.2: de prijsregel is doorgerekend (DAY.whatIf, bij het sluiten van de dag in sm.whatIf gezet)
+    const wi = sm.whatIf;
+    if (wi && !wi.none && wi.wine) {
+      const key = wi.to === 'aanbieding' ? (wi.moved ? 'wiOfferMove' : wi.extra > 0 ? 'wiOffer' : 'wiOfferPlain') : wi.from === 'aanbieding' ? 'wiNoOffer' : wi.to === 'stevig' ? 'wiStevig' : 'wiNormaal';
+      cands.push({ key, wine: wi.wine, other: wi.moved || null, diff: wi.diff, n: Math.abs(wi.extra || 0), stand: wi.to, tab: 'prices', loss: wi.diff });
     }
     const bought = Object.keys(W).filter(id => W[id].sold > 0);
     for (const id in stands) if (bought.length >= 2 && !(W[id] && W[id].sold) && !(W[id] && (W[id].soldOut || W[id].tooExpensive))) cands.push({ key: 'idle', wine: id, tab: 'order', loss: 6 });
@@ -707,6 +784,7 @@
     if (worst && T[worst].nothing / Math.max(1, sm.customers) >= 0.15) cands.push({ key: 'nothing', type: worst, n: T[worst].nothing, tab: 'order', loss: T[worst].nothing * 4 });
     cands.sort((a, b) => b.loss - a.loss);
     if (cands.length && cands[0].loss >= 5) return cands[0];
+    if (sm.priceOk) return { key: 'priceOk', tab: 'prices', loss: 0 };   // hoogstens eens per week (main.js)
     // niets misgegaan: noem de topper
     const top = bought.sort((a, b) => W[b].margin - W[a].margin)[0];
     return top ? { key: 'best', wine: top, n: W[top].sold, margin: W[top].margin, tab: 'prices', loss: 0 } : null;

@@ -54,7 +54,7 @@ console.log('M1-5: prijsstanden');
 {
   const w = CC.wineById('wine_merlot');
   check('normaal = €5', CC.priceFor(w, 'normaal') === 5);
-  check('woeker = €8', CC.priceFor(w, 'woeker') === 8);
+  check('aanbieding = €4, stevig = €6', CC.priceFor(w, 'aanbieding') === 4 && CC.priceFor(w, 'stevig') === 6);   // 14_PRIJZEN: woeker is weg
 }
 
 console.log(fails ? `\n${fails} FOUT(EN)` : '\nAlles groen.');

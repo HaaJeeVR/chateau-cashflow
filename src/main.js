@@ -444,6 +444,7 @@
     }
     app.panel = null; app.phase = 'sale'; app.speed = app.speed || 1; app.acc = 0;
     app.s.flags.opened = true;
+    app.daySnap = JSON.parse(JSON.stringify(app.s));   // 14_PRIJZEN §3.2: beginstand van de dag, voor de wat-als-regel
     app.day = DAY.start(app.s);
     app.day.visual = true;
   };
@@ -465,6 +466,10 @@
   function endDay() {
     app.advice = null;
     app.summary = SIM.endDay(app.s, app.day.log);
+    if (app.daySnap && DAY.whatIf) { try { app.summary.whatIf = DAY.whatIf(app.daySnap); } catch (e) { app.summary.whatIf = null; } }
+    // "je prijzen stonden goed" hoogstens eens per week
+    if (app.summary.whatIf && app.summary.whatIf.none && app.s.priceOkWeek !== app.s.week) { app.summary.priceOk = true; app.s.priceOkWeek = app.s.week; }
+    app.daySnap = null;
     app.s.resultOpen = true;   // herladen op de bon = dezelfde bon, geen herhaling van de dag
     app.phase = 'result'; app.resultT = 0;
     const T = CC.TEXT.result;
@@ -639,8 +644,8 @@
         } else if (f.kind === 'counter') app.worldRects.counter = R.drawCounter(ctx, f, hover === 'w_counter');
         else if (f.kind === 'counterFront' && PAINT) { app.worldRects.counter = CC.BG.register; app.worldRects.phone = CC.BG.phone; }
         else if (PAINT && (f.kind === 'barrel' || f.kind === 'crates' || f.kind === 'plant')) { /* geschilderd */ }
-        else if (f.kind === 'table' && PAINT) R.paintedTable(ctx, f, s, app.images);
-        else if (f.kind === 'decor') { if (PAINT) R.paintedDecor(ctx, f, app.images, app.t); }
+        else if (f.kind === 'table' && PAINT) { R.paintedTable(ctx, f, s, app.images); if (!R.offerOnBoard(s)) R.offerBottle(ctx, s, 'table', app.t); }
+        else if (f.kind === 'decor') { if (PAINT) { R.paintedDecor(ctx, f, app.images, app.t); if (f.id === 'decor_stoepbord') R.offerBottle(ctx, s, 'board', app.t); } }
         else if (f.kind === 'counterFront') { const r = R.drawCounterFront(ctx, f, hover === 'w_counter' ? 'register' : (hover === 'w_phone' ? 'phone' : null)); app.worldRects.counter = r.register; app.worldRects.phone = r.phone; }
         else if (f.kind === 'crates') R.drawCrates(ctx, f);
         else if (f.kind === 'plant') R.drawPlant(ctx, f, app.t);

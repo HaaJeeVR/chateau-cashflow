@@ -13,8 +13,9 @@ console.log('F3-1: avondinzicht');
   const s = CC.newState(1);
   let i = S.insight(s, sm({ wine_merlot: W(10, 6), wine_rioja: W(3, 0, 2) }));
   check('uitverkocht weegt het zwaarst', i && i.key === 'soldOut' && i.wine === 'wine_merlot' && i.tab === 'order', JSON.stringify(i));
-  i = S.insight(s, sm({ wine_merlot: W(10), wine_chablis: W(1, 0, 5) }));
-  check('te duur → naar prijzen', i && i.key === 'tooExpensive' && i.wine === 'wine_chablis' && i.tab === 'prices', JSON.stringify(i));
+  // 14_PRIJZEN: de prijsregel is nu doorgerekend (whatIf), niet meer "te duur"
+  i = S.insight(s, sm({ wine_merlot: W(10), wine_chablis: W(1, 0, 5) }, { whatIf: { wine: 'wine_chablis', from: 'stevig', to: 'normaal', diff: 14, extra: 0 } }));
+  check('wat-als → naar prijzen', i && i.key === 'wiNormaal' && i.wine === 'wine_chablis' && i.tab === 'prices' && i.diff === 14, JSON.stringify(i));
   i = S.insight(s, sm({ wine_merlot: W(10), wine_rioja: W(4) }));
   check('niets mis → de topper van de dag', i && i.key === 'best' && i.wine === 'wine_merlot');
   check('lege dag → geen inzicht', S.insight(s, { customers: 0 }) === null);

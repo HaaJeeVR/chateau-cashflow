@@ -37,17 +37,23 @@
 
     // Prijsstanden (factor × inkoop). Prijs wordt afgerond op €0,50.
     priceStands: [
-      { id: 'scherp', name: 'Scherp', factor: 1.3 },
+      { id: 'aanbieding', name: 'Aanbieding', factor: 1.3 },   // 14_PRIJZEN: was "scherp"; één wijn tegelijk, trekt extra klanten
       { id: 'normaal', name: 'Normaal', factor: 1.6 },
       { id: 'stevig', name: 'Stevig', factor: 2.0 },
-      { id: 'woeker', name: 'Woeker', factor: 2.6 },
-    ],
+    ],   // "woeker" (2,6) is weg (14_PRIJZEN)
+    // Aanbieding (14_PRIJZEN §2.2): extra klanten = pop × perPop × min(reachCap, (gewone loop / loop op niveau 1)^scale),
+    // afgerond. De helft koopjesjager of buurtbewoner (types), de rest uit de gewone mix (other). Wie de aanbieding
+    // koopt, neemt met kans extraQty een fles extra (max 3).
+    offer: { perPop: 0.55, scale: 1.6, reachCap: 1.9, other: 0.5, extraQty: 0.6, types: { koopjes: 0.6, buurt: 0.4 } },
     defaultStand: 'normaal',
 
     // Klantbeslissing (zie 01_ONTWERP §6)
     buyThreshold: 3.5,
     noise: 1.5,             // ± uniform
     pricePenaltyMul: 3,
+    offerAppeal: 0.3,       // 14_PRIJZEN: hoe sterk een aanbieding de wijn zelf aantrekkelijker maakt (1 = zoals scherp vroeger)
+    whatIfMin: 0.10, whatIfMinEuro: 5,   // 14_PRIJZEN §3.2: wat-als-regel alleen bij minstens 10 % van de dagmarge (en €5)
+    fatimaReach: 0.8,       // 14_PRIJZEN: Fatima haalt alleen terug wie hoogstens zoveel onder de koopdrempel zit
     qtyWeights: [[1, 50], [2, 33], [3, 17]],
     repBonus: { step: 220, max: 6 },   // B4: boven niveau 8 elke 220 reputatie +1 klant per dag, tot +6 (handoff: 150 bij drempel 650; meegeschaald met 950)
     boxFromQty: 3,
@@ -91,18 +97,18 @@
 
     // Reputatie en niveaus (01_ONTWERP §8)
     levelRep: [0, 28, 80, 155, 300, 470, 690, 950],      // drempel per niveau 1–8 (B2 "licht", besluit 119: 5–8 trager; was 245, 355, 490, 650)
-    repPerSale: 1, repPrestigeBonus: 1, repWoeker: -2,
+    repPerSale: 1, repPrestigeBonus: 1,
   };
 
   // Klanttypes. budget in euro, wPop/wPrest = gewichten, sens = prijsgevoel,
   // likes = stijlen waar dit type een lichte voorkeur voor heeft (+prefBonus op de score, besluit 35).
   CC.CUSTOMER_TYPES = {
     buurt: {
-      name: 'Buurtbewoner', budget: [5, 14], likes: ['soepel', 'fris'], wPop: 0.8, wPrest: 0.2, sens: 1.0, weight: 5, minLevel: 1,
+      name: 'Buurtbewoner', budget: [5, 14], likes: ['soepel', 'fris'], wPop: 0.8, wPrest: 0.2, sens: 2.2,   /* 14_PRIJZEN: was 1,0 */ weight: 5, minLevel: 1,
       look: { body: '#5e8a5f', body2: '#2f5541', legs: '#45566b', hair: '#7a4a24', skin: 'skin1', prop: 'bag' },
     },
     koopjes: {
-      name: 'Koopjesjager', budget: [3, 9], likes: [], wPop: 0.6, wPrest: 0.0, sens: 1.8, weight: 3, minLevel: 1,
+      name: 'Koopjesjager', budget: [3, 9], likes: [], wPop: 0.6, wPrest: 0.0, sens: 3.0,   /* 14_PRIJZEN: was 1,8 */ weight: 3, minLevel: 1,
       look: { body: '#d4cbbb', body2: '#a39a8c', legs: '#6b6259', hair: '#a39a8c', skin: 'skin2', prop: 'cap' },
     },
     liefhebber: {

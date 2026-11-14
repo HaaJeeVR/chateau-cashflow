@@ -74,6 +74,13 @@
       st.stock = remap(st.stock || {});
       const pr = {}; for (const k in (st.prices || {})) pr[mv(k)] = st.prices[k]; st.prices = pr;
       for (const w of CC.WINES) if (!st.prices[w.id]) st.prices[w.id] = CC.CONFIG.defaultStand;
+      // 14_PRIJZEN: woeker → stevig; scherp heet aanbieding en mag maar bij één wijn (de eerste blijft, de rest normaal)
+      let offer = false;
+      for (const k in st.prices) {
+        if (st.prices[k] === 'woeker') st.prices[k] = 'stevig';
+        if (st.prices[k] === 'scherp' || st.prices[k] === 'aanbieding') { st.prices[k] = offer ? 'normaal' : 'aanbieding'; offer = true; }
+        if (!CC.standById(st.prices[k])) st.prices[k] = CC.CONFIG.defaultStand;
+      }
       for (const v in st.vakken) if (st.vakken[v].wine) st.vakken[v].wine = mv(st.vakken[v].wine);
       if (st.vitrine) st.vitrine = mv(st.vitrine);
       return st;

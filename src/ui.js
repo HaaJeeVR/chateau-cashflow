@@ -300,6 +300,8 @@
     const rows = [];
     if (fc.rep) { const rb = CC.SIM.repBonus(app.s); rows.push({ id: 'fc_rep', txt: `+${fc.rep} door je reputatie`, star: true,
       tip: `Boven niveau 8 trekt elke ${CC.CONFIG.repBonus.step} reputatie 1 klant per dag extra (max ${rb.max}). Ze zitten in het totaal hierboven.` + (rb.next ? ` Volgende bij ${rb.next} (nu ${app.s.rep}).` : '') }); }
+    if (fc.offer && fc.offerWine) rows.push({ id: 'fc_offer', txt: `+${fc.offer} door de aanbieding`, tag: true,
+      tip: CC.TEXT.forecast.offerTip.split('{wine}').join(CC.wineById(fc.offerWine).name).split('{n}').join(String(fc.offer)) });
     if (!rows.length) return 0;
     const h = rows.length * 12 + 4;
     R().round(ctx, x, y, w, h, 5, 'rgba(31,10,14,0.85)');
@@ -308,9 +310,17 @@
       const hv = UI.hit(app, r.id, x + 3, yy - 1, w - 6, 12, null, r.tip);
       if (hv) R().round(ctx, x + 3, yy - 1, w - 6, 12, 3, 'rgba(232,181,58,0.18)');
       if (r.star) UI.miniStar(ctx, x + 8, yy + 1, P.gold2);
-      F().draw(ctx, r.txt, x + 18, yy + 1, P.gold2);
+      if (r.tag) UI.offerTag(ctx, x + 5, yy);
+      F().draw(ctx, r.txt, x + 18, yy + 1, r.tag ? P.green4 : P.gold2);
     });
     return h + 2;
+  };
+  // prijskaartje met een procentteken (11 × 9): aanbieding in de prognose en op het bord in de winkel
+  UI.offerTag = function (ctx, x, y) {   // 12 × 10
+    R().round(ctx, x, y, 12, 10, 2, P.ink); R().round(ctx, x + 1, y + 1, 10, 8, 2, P.green3);
+    const c = P.cream3;   // %: twee bolletjes van 2 × 2 en een schuine streep
+    R().rect(ctx, x + 2, y + 2, 2, 2, c); R().rect(ctx, x + 8, y + 6, 2, 2, c);
+    for (let i = 0; i < 6; i++) R().rect(ctx, x + 8 - i, y + 2 + i, 1, 1, c);
   };
   // klein sterretje van 7 × 7 (alleen paletkleuren)
   UI.miniStar = function (ctx, x, y, col) {
@@ -412,7 +422,7 @@
   UI.insightText = function (ins) {
     if (!ins) return null;
     const T = CC.TEXT.insight, w = ins.wine && CC.wineById(ins.wine);
-    const o = { n: ins.n, wine: w ? w.name : '', stand: ins.stand ? CC.standById(ins.stand).name.toLowerCase() : '', price: ins.price != null ? R().euro(ins.price) : '', margin: ins.margin != null ? R().euro(Math.round(ins.margin)) : '', type: ins.type ? CC.TEXT.typeInfo[ins.type].many : '' };
+    const o = { n: ins.n, wine: w ? w.name : '', stand: ins.stand ? CC.standById(ins.stand).name.toLowerCase() : '', price: ins.price != null ? R().euro(ins.price) : '', margin: ins.margin != null ? R().euro(Math.round(ins.margin)) : '', type: ins.type ? CC.TEXT.typeInfo[ins.type].many : '', diff: ins.diff != null ? R().euro(ins.diff) : '', other: ins.other ? CC.wineById(ins.other).name : '' };
     return Object.keys(o).reduce((a2, k2) => a2.split('{' + k2 + '}').join(o[k2]), T[ins.key]);
   };
   // Zin en tip over de volle breedte; de knop rechts op de titelregel. noTip: alleen de zin (als de ruimte krap is).
@@ -433,7 +443,7 @@
     const tip = ins.type ? tipRaw.split('{type}').join(CC.TEXT.typeInfo[ins.type].many.replace(/^./, c => c.toUpperCase())).split('{want}').join(CC.TEXT.typeInfo[ins.type].want) : tipRaw;
     const tipLines = tip ? F().wrap(tip, w - 14).slice(0, 2) : [];
     const h = 18 + lines.length * 10 + (tipLines.length ? tipLines.length * 10 + 2 : 0) + 3;
-    const bad = ins.key !== 'best';
+    const bad = ins.key !== 'best' && ins.key !== 'priceOk';
     R().round(ctx, x, y, w, h, 5, P.ink);
     R().round(ctx, x + 1, y + 1, w - 2, h - 2, 4, bad ? '#fbe9d0' : '#e9f2dc');
     R().rect(ctx, x + 1, y + 4, 2, h - 8, bad ? P.gold : P.green3);
@@ -552,7 +562,7 @@
     F().draw(ctx, rp.next ? `niveau ${rp.lv} · nog ${rp.next - Math.round(s.rep)} tot niveau ${rp.lv + 1}` : `niveau ${rp.lv} · hoogste niveau`, rx, ry, P.stone1); ry += 11;
     // waar kwam de reputatie vandaan? (besluit 76)
     const RP = sm.repParts || {}, rn = v => (v > 0 ? '+' : '') + String(Math.round(v * 10) / 10).replace('.', ',');
-    const parts = [['verkoop', RP.sale], ['prestige', RP.prestige], ['advies', RP.advice], ['klus', RP.klus], ['woeker', RP.woeker]].filter(p2 => p2[1]);
+    const parts = [['verkoop', RP.sale], ['prestige', RP.prestige], ['advies', RP.advice], ['klus', RP.klus]].filter(p2 => p2[1]);
     if (parts.length) {   // past het niet op één regel, dan over twee
       const pl = parts.map(p2 => `${p2[0]} ${rn(p2[1])}`), one = pl.join(' · ');
       const rowsP = F().width(one) <= rw ? [one] : [pl.slice(0, Math.ceil(pl.length / 2)).join(' · '), pl.slice(Math.ceil(pl.length / 2)).join(' · ')];
@@ -670,7 +680,7 @@
       if (i % 2 === 0) R().round(ctx, x + 8, y - 2, PW - 16, 12, 3, P.cream3);
       const st = stands[id] ? CC.standById(stands[id]).name : '-';
       F().draw(ctx, wn.name, x + 14, y, P.ink);
-      F().draw(ctx, st, x + 108, y, stands[id] === 'scherp' ? P.green2 : (stands[id] === 'stevig' || stands[id] === 'woeker' ? P.bord3 : P.stone1));
+      F().draw(ctx, st, x + 108, y, stands[id] === 'aanbieding' ? P.green2 : (stands[id] === 'stevig' ? P.bord3 : P.stone1));
       F().draw(ctx, String(ws.sold), x + 172, y, ws.sold ? P.ink : P.stone2, { align: 'right' });
       F().draw(ctx, R().euro(ws.margin), x + 214, y, ws.margin ? P.green2 : P.stone2, { align: 'right' });
       F().draw(ctx, String(ws.tooExpensive), x + 248, y, ws.tooExpensive ? P.red : P.stone2, { align: 'right' });
@@ -2282,32 +2292,39 @@
     });
   };
 
+  // 14_PRIJZEN §3.1: drie standen; per stand de klanttypes met wat ze doen (koopt / twijfelt / haakt af), uit dezelfde
+  // formule als de klantkeuze (SIM.priceVerdict). Types die vandaag verwacht worden staan fel, de rest gedimd.
+  UI.VERDICT = { koopt: 'koopt', twijfelt: 'twijfelt', haakt: 'haakt af' };
+  UI.verdictMark = function (ctx, v, x, y) {   // 5 × 6, rechts naast het icoontje
+    if (v === 'koopt') { const c = P.green3; R().rect(ctx, x, y + 3, 1, 2, c); R().rect(ctx, x + 1, y + 4, 1, 2, c); R().rect(ctx, x + 2, y + 3, 1, 2, c); R().rect(ctx, x + 3, y + 1, 1, 3, c); R().rect(ctx, x + 4, y, 1, 2, c); }
+    else if (v === 'twijfelt') { const c = P.gold; R().rect(ctx, x, y + 3, 1, 1, c); R().rect(ctx, x + 1, y + 2, 1, 1, c); R().rect(ctx, x + 2, y + 3, 1, 1, c); R().rect(ctx, x + 3, y + 4, 1, 1, c); R().rect(ctx, x + 4, y + 3, 1, 1, c); R().rect(ctx, x, y + 2, 1, 1, c); R().rect(ctx, x + 4, y + 2, 1, 1, c); }
+    else { const c = P.red; for (let i = 0; i < 5; i++) { R().rect(ctx, x + i, y + i, 1, 1, c); R().rect(ctx, x + 4 - i, y + i, 1, 1, c); } }
+  };
+  UI.verdictTip = function (k, v, st, w, s) {
+    const T = CC.TEXT.assort, info = CC.TEXT.typeInfo[k], ct = CC.CUSTOMER_TYPES[k];
+    const head = `${info.many} bij ${R().euro(v.price)} (${st.name.toLowerCase()}): ${UI.VERDICT[v.verdict]}.`;
+    const why = v.why ? ' ' + T.why[v.why].split('{n}').join(String(Math.round(v.budget * 100))).split('{min}').join(R().euro(ct.distrustBelow || 0)) : '';
+    const today = v.n ? ` Vandaag verwacht: ${v.n}.` : ' Vandaag niet verwacht.';
+    return head + why + today;
+  };
   UI.pricesTab = function (app, ctx, x, y) {
     const s = app.s, SIM = CC.SIM, T = CC.TEXT.assort, C = CC.CONFIG;
     s.flags.pricesSeen = true;
     T.pricesIntro.forEach((l, i) => F().draw(ctx, l, x + 16, y + 32 + i * 10, P.stone1));
-    // klanten van vandaag (dezelfde als "Vandaag verwacht"): budgetten per type
+    // klanten van vandaag (dezelfde als "Vandaag verwacht")
     const plan = SIM.planDay(s, SIM.dayRng(s));
-    const types = Object.keys(CC.CUSTOMER_TYPES).sort((a, b) => CC.CUSTOMER_TYPES[a].budget[1] - CC.CUSTOMER_TYPES[b].budget[1]).filter(k => plan.some(p => p.type === k));   // van krap naar ruim budget
-    const top = y + 58;
+    const types = Object.keys(CC.CUSTOMER_TYPES).filter(k => CC.CUSTOMER_TYPES[k].minLevel <= s.level)
+      .sort((a, b) => CC.CUSTOMER_TYPES[a].budget[1] - CC.CUSTOMER_TYPES[b].budget[1]);   // van krap naar ruim budget
+    const top = y + 58, CX = x + 146, CW = 96;
     F().draw(ctx, 'Wijn', x + 16, top, P.bord2);
-    C.priceStands.forEach((st, k) => F().draw(ctx, st.name, x + 150 + k * 50 + 23, top, P.bord2, { align: 'center' }));
-    // koppen van de budgetbalkjes: icoontje per klanttype (besluit 103)
-    const bx0 = x + 356, bstep = types.length ? Math.min(22, Math.floor(80 / types.length)) : 20;
-    types.forEach((k, j) => {
-      const ct = CC.CUSTOMER_TYPES[k], cx = bx0 + j * bstep;
-      R().typeIcon(ctx, k, cx + 1, top - 3);
-      UI.hit(app, 'bh_' + k, cx, top - 2, bstep, 11, null, `${CC.TEXT.typeInfo[k].many} (${plan.filter(p => p.type === k).length} vandaag)`);
-    });
-    if (types.length) UI.hit(app, 'bh_all', bx0 - 2, top - 2, 2, 11, null, T.budgetHelp);
+    C.priceStands.forEach((st, k) => F().draw(ctx, st.name, CX + k * CW + (CW - 4) / 2, top, st.id === 'aanbieding' ? P.green2 : st.id === 'stevig' ? P.bord3 : P.bord2, { align: 'center' }));
+    UI.hit(app, 'pr_head_aanb', CX, top - 2, CW - 4, 11, null, T.offerHelp);
     R().rect(ctx, x + 10, top + 9, AW - 20, 1, P.cream1);
     const listed = SIM.listed(s).map(l => l.wine).filter((w, i, a) => a.indexOf(w) === i);
     let ry = top + 13;
-    // A5 (zoals besluit 91 bij bestellen): de rijhoogte groeit mee met de ruimte, zodat het venster met weinig wijnen
-    // niet half leeg is. Ruim: grote fles, soort en stijl, wat er gisteren gebeurde, en de marge onder elke prijsknop.
-    const avail = (y + AH - 44) - ry, fitH = Math.floor(avail / Math.max(1, listed.length));
-    const rowH = fitH >= 48 ? Math.min(56, fitH) : fitH >= 36 ? Math.min(40, fitH) : (listed.length > 7 ? 26 : 28);
-    const rich = rowH >= 48, mid = !rich && rowH >= 36;
+    const avail = (y + AH - 34) - ry, fitH = Math.floor(avail / Math.max(1, listed.length));
+    const rowH = fitH >= 44 ? Math.min(52, fitH) : fitH >= 34 ? Math.min(40, fitH) : Math.max(27, Math.min(30, fitH));
+    const rich = rowH >= 44, mid = !rich && rowH >= 34;
     const last = s.history[s.history.length - 1], lw = (last && last.wines) || {};
     if (!listed.length) F().draw(ctx, 'Er staat nog niets op je schappen. Bestel eerst iets bij Ronnie.', x + 16, ry + 4, P.stone1);
     listed.forEach((w, i) => {
@@ -2318,10 +2335,9 @@
       else if (mid) { if (!R().wineSprite(ctx, w, 'icoon', x + 19, ry + rowH - 6)) R().bottleMid(ctx, x + 20, ry + 12, w); }
       else R().bottleMid(ctx, x + 20, ry + 10, w);
       F().draw(ctx, w.name, x + NX, ry + 2, P.ink);
-      const cur = s.prices[w.id], price = SIM.price(s, w.id), cost = CC.wineCost(w);
-      const colW = 146 - NX, fit = t => { while (F().width(t) > colW && t.includes(', ')) t = t.slice(0, t.lastIndexOf(', ')); while (F().width(t) > colW && t.length > 3) t = t.slice(0, -2) + '.'; return t; };
-      // ruim: marge staat onder elke prijsknop, dus hier alleen de inkoop
-      F().draw(ctx, rich || mid ? `inkoop ${R().euro(cost)}` : `inkoop ${R().euro(cost)} · marge ${R().euro(price - cost)}`, x + NX, ry + 12, P.stone1);
+      const cur = s.prices[w.id], cost = CC.wineCost(w);
+      const colW = CX - x - NX - 6, fit = t => { while (F().width(t) > colW && t.includes(', ')) t = t.slice(0, t.lastIndexOf(', ')); while (F().width(t) > colW && t.length > 3) t = t.slice(0, -2) + '.'; return t; };
+      F().draw(ctx, `inkoop ${R().euro(cost)}`, x + NX, ry + 12, P.stone1);
       if (rich || mid) {
         const stijl = (w.stijl || []).filter(st => st !== 'bubbels').map(st => CC.TEXT.stijlAdj[st] || st);
         F().draw(ctx, fit([CC.TEXT.soortName[CC.roleById(w.role).kind]].concat(stijl).join(', ')), x + NX, ry + 22, P.wood2);
@@ -2331,27 +2347,36 @@
         F().draw(ctx, fit(`gisteren ${g.sold} verkocht` + (g.tooExpensive ? `, ${g.tooExpensive} te duur` : '')), x + NX, ry + 32, g.tooExpensive ? P.bord3 : P.stone1);
       }
       C.priceStands.forEach((st, k) => {
-        const p = CC.priceFor(w, st.id), on = cur === st.id;
-        UI.btn(app, ctx, `pr_${w.id}_${st.id}`, x + 150 + k * 50, ry + 2, 46, 16, R().euro(p), () => app.setPrice(w.id, st.id),
-          { active: on, tone: st.id === 'woeker' ? 'bord' : st.id === 'scherp' ? 'green' : 'wood', tip: st.id === 'woeker' ? T.woekerTip : `${st.name}: ${R().euro(p)} (marge ${R().euro(p - cost)} per fles)` });
-        if (rich || mid) F().draw(ctx, '+' + R().euro(p - cost), x + 150 + k * 50 + 23, ry + 21, on ? P.ink : P.stone1, { align: 'center' });
-      });
-      types.forEach((k, j) => {
-        const cs = plan.filter(p => p.type === k), ok = cs.filter(p => SIM.budgetOf(s, p) >= price).length, f = cs.length ? ok / cs.length : 0;
-        const cx = bx0 + j * bstep + 2, bh = rich || mid ? Math.min(30, rowH - 12) : 16;
-        R().rect(ctx, cx + 2, ry + 2, 7, bh, P.ink);
-        R().rect(ctx, cx + 3, ry + 3, 5, bh - 2, P.cream1);
-        const fh = Math.round((bh - 2) * f);
-        R().rect(ctx, cx + 3, ry + 3 + (bh - 2 - fh), 5, fh, f >= 0.66 ? P.green3 : f >= 0.33 ? P.gold : P.red);
-        UI.hit(app, `bb_${w.id}_${k}`, cx, ry, bstep, bh + 4, null, `${CC.TEXT.typeInfo[k].many}: ${ok} van de ${cs.length} kunnen ${R().euro(price)} betalen`);
+        const p = CC.priceFor(w, st.id), on = cur === st.id, cx = CX + k * CW;
+        let tip = `${st.name}: ${R().euro(p)}, marge ${R().euro(p - cost)} per fles.`;
+        if (st.id === 'aanbieding') {
+          const other = Object.keys(s.prices).find(id => id !== w.id && s.prices[id] === 'aanbieding');
+          tip += ' ' + T.offerTip.split('{n}').join(String(Math.round(SIM.offerReach(s, w.id)))) + (other ? ' ' + T.offerMove.split('{wine}').join(CC.wineById(other).name) : '');
+        }
+        UI.btn(app, ctx, `pr_${w.id}_${st.id}`, cx, ry + 1, CW - 6, 13, `${R().euro(p)}  +${R().euro(p - cost)}`, () => app.setPrice(w.id, st.id),
+          { active: on, tone: 'wood', tip });
+        // wie koopt dit nog?
+        let tx = cx + 1;
+        const ty = ry + 16;
+        for (const kk of types) {
+          const v = SIM.priceVerdict(s, w, st.id, kk, plan), dim = !v.n;
+          if (dim) ctx.globalAlpha = 0.35;
+          R().typeIcon(ctx, kk, tx, ty - 1, false);
+          UI.verdictMark(ctx, v.verdict, tx + 13, ty + 3);
+          ctx.globalAlpha = 1;
+          UI.hit(app, `pv_${w.id}_${st.id}_${kk}`, tx - 1, ty - 2, 20, 13, null, UI.verdictTip(kk, v, st, w, s));
+          tx += Math.floor((CW - 6) / Math.max(4, types.length));
+        }
       });
       ry += rowH;
     });
-    F().wrap(T.pricesFoot, AW - 32).slice(0, 2).forEach((l, i) => F().draw(ctx, l, x + 16, y + AH - 40 + i * 10, P.stone1));
-    // legenda van de balkjes: welk icoontje is welk klanttype
+    // legenda
     let lx = x + 16; const ly = y + AH - 18;
-    F().draw(ctx, 'Balkjes:', lx, ly, P.bord2); lx += F().width('Balkjes:') + 6;
-    types.forEach(k => { R().typeIcon(ctx, k, lx, ly - 3); lx += 15; const nm = CC.TEXT.typeInfo[k].many; F().draw(ctx, nm, lx, ly, P.ink); lx += F().width(nm) + 10; });
+    UI.verdictMark(ctx, 'koopt', lx, ly + 1); lx += 8; F().draw(ctx, 'koopt', lx, ly, P.ink); lx += F().width('koopt') + 10;
+    UI.verdictMark(ctx, 'twijfelt', lx, ly + 1); lx += 8; F().draw(ctx, 'twijfelt', lx, ly, P.ink); lx += F().width('twijfelt') + 10;
+    UI.verdictMark(ctx, 'haakt', lx, ly + 1); lx += 8; F().draw(ctx, 'haakt af', lx, ly, P.ink); lx += F().width('haakt af') + 12;
+    F().draw(ctx, T.legendDim, lx, ly, P.stone1);
+    UI.hit(app, 'pv_legend', x + 14, ly - 2, AW - 28, 12, null, T.pricesFoot);
   };
 
   CC.UI = UI;
