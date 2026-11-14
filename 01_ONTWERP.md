@@ -49,7 +49,7 @@ TITEL → [WEEK: 6 × (VOORBEREIDEN → VERKOOPDAG → DAGRESULTAAT)] → ZONDAG
 |---|---|
 | Startkas | €400 (besluit 70: week 1 knelt al) |
 | Vaste lasten (huur + energie) | €20 per verkoopdag |
-| Aflossing per week (zondag) | 90 · 150 · 240 · 360 · 520 · 720 · 1.200 · 2.200 (totaal €5.480; besluit 70, 72, 76) |
+| Aflossing per week (zondag) | lening normaal: 90 · 150 · 240 · 360 · 520 · 720 · 1.200 · 2.200 (totaal €5.480; besluit 70, 72, 76). Bij een nieuw spel kies je ook ruim (×0,9, €4.940) of krap (×1,12, €6.130), besluit 123 |
 | Uitstel | 1× per run, +€100 |
 
 ### Waarom dit werkt

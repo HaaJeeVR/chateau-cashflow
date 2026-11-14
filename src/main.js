@@ -178,7 +178,8 @@
     if (!e.repeat) app.actT = app.t;
     if (app.phase === 'intro') return introKey(e);
     if (app.dialog) { if (e.key === 'Escape') app.closeDialog(); return; }   // feedback- of codevenster open (typen gaat via het tekstvak)
-    if (app.confirmNew) { if (e.key === 'Escape') app.confirmNew = false; if (e.key === 'Enter') app.newGame(); return; }
+    if (app.loanPick) { if (e.key === 'Escape') app.loanPick = false; if (e.key === 'Enter') app.newGame(CC.getSetting('lastLoan') || 'normaal'); return; }
+    if (app.confirmNew) { if (e.key === 'Escape') app.confirmNew = false; if (e.key === 'Enter') app.askLoan(); return; }
     if (e.key === 'F1') { e.preventDefault(); DBG.toggle(); }
     if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) { app.toggleFullscreen(); return; }
     if (app.advice) {
@@ -289,17 +290,20 @@
   // ---------- Acties ----------
   app.rebuildRoom = function () { R.roomCache = R.buildRoom(app.s ? app.s.level : 1, app.images); app.roomLevel = app.s ? app.s.level : 1; };
   // Nieuw spel: bestaat er een lopend spel, dan eerst vragen (titelscherm) en het oude als reservekopie bewaren.
-  app.newGame = function () {
+  app.newGame = function (loan) {
     const old = CC.load();
     if (old && (old.status === 'playing' || old.status === 'endless')) CC.backupSave();
     app.hasBackup = CC.hasBackup();
-    app.confirmNew = false;
-    app.s = CC.newState(); app.rebuildRoom(); app.startPrep();
+    app.confirmNew = false; app.loanPick = false;
+    app.s = CC.newState(null, loan || CC.getSetting('lastLoan') || 'normaal'); app.rebuildRoom(); app.startPrep();
+    CC.setSetting('lastLoan', app.s.loan);
   };
+  // B5: eerst de lening kiezen (ruim · normaal · krap); daarna pas het nieuwe spel
+  app.askLoan = function () { app.confirmNew = false; app.loanPick = true; };
   app.askNewGame = function () {
     const old = app.hasSave && CC.load();
     if (old && (old.status === 'playing' || old.status === 'endless') && (old.week > 1 || old.day > 0 || old.totals.days > 0)) { app.confirmOld = old; app.confirmNew = true; }
-    else app.newGame();
+    else app.askLoan();
   };
   app.restoreBackup = function () { if (CC.restoreBackup()) { app.hasSave = CC.hasSave(); app.hasBackup = CC.hasBackup(); app.continueGame(); } };
   // Hervatten precies waar je was: open kassabon, zondag (bank/kaarten), einde. Nooit een dag of betaling dubbel.
@@ -336,7 +340,7 @@
     // klik op het avondinzicht van gisteren: nu het venster op die wijn openen
     // allereerste ochtend: de bankier legt het doel uit (M7, besluit 78)
     if (!app.s.flags.introSeen && app.s.week === 1 && app.s.day === 0) {
-      const T = CC.TEXT.tutorial, R2 = CC.CONFIG.repay;
+      const T = CC.TEXT.tutorial, R2 = SIM.repaySched(app.s);
       app.notice = { who: 'bankier', title: T.introTitle, text: T.intro.map(l => l.split('{first}').join(R.euro(R2[0])).split('{last}').join(R.euro(R2[R2.length - 1]))).join('\n'), btn: T.introBtn, flag: 'introSeen', next: app.notice };
     }
     if (app.pendingFocus) { const f = app.pendingFocus; app.pendingFocus = null; app.focusWine(f.tab, f.wine); }
@@ -511,9 +515,9 @@
     }
     if (!SIM.inLoan(s)) { app.setSunday({ week: s.week, stage: 'done', mood: 'happy', text: B.endless, due: 0 }); app.offerCards(); app.save(); return; }
     const due = SIM.weekDue(s), cash = s.cash;
-    const canPay = cash >= due, canPostpone = !s.postponed && s.week < C.repay.length;
+    const RP = SIM.repaySched(s), canPay = cash >= due, canPostpone = !s.postponed && s.week < RP.length;
     let text, mood;
-    if (canPay && cash - due >= due * 0.5) { text = s.week === 1 ? B.firstWeek.split('{due}').join(money(due)).split('{next}').join(money(C.repay[1])).split('{last}').join(money(C.repay[C.repay.length - 1])) : s.week === C.repay.length ? B.lastWeek.split('{due}').join(money(due)) : CC.pickText(B.ok, null, { due: money(due) }); mood = 'neutral'; }
+    if (canPay && cash - due >= due * 0.5) { text = s.week === 1 ? B.firstWeek.split('{due}').join(money(due)).split('{next}').join(money(RP[1])).split('{last}').join(money(RP[RP.length - 1])) : s.week === RP.length ? B.lastWeek.split('{due}').join(money(due)) : CC.pickText(B.ok, null, { due: money(due) }); mood = 'neutral'; }
     else if (canPay) { text = CC.pickText(B.tight, null, { due: money(due), left: money(cash - due) }); mood = 'neutral'; }
     else {
       text = CC.pickText(B.short, null, { due: money(due), cash: money(Math.max(0, cash)), short: money(due - cash) }) + ' ' +
@@ -526,12 +530,15 @@
   };
   // A7: beste score bewaren in de instellingen (los van de spelsave, net als introSeen).
   // app.prevBest = de beste score van vóór deze run, zodat het schuldenvrij-scherm "nieuw record" kan zeggen.
+  // B5: per lening een eigen beste score ('bestScore' = normaal, zodat de score van vóór B5 blijft staan)
+  app.bestKey = loan => (!loan || loan === 'normaal' ? 'bestScore' : 'bestScore_' + loan);
   app.recordBest = function () {
-    const sc = UI.finalScore(app.s).total, prev = CC.getSetting('bestScore');
+    const key = app.bestKey(app.s.loan), sc = UI.finalScore(app.s).total, prev = CC.getSetting(key);
     app.prevBest = prev && prev.score ? prev.score : 0;
-    if (sc > app.prevBest) CC.setSetting('bestScore', { score: sc, level: app.s.level, date: new Date().toISOString().slice(0, 10) });
+    if (sc > app.prevBest) CC.setSetting(key, { score: sc, level: app.s.level, loan: app.s.loan || 'normaal', date: new Date().toISOString().slice(0, 10) });
   };
-  app.bestScore = function () { const b = CC.getSetting('bestScore'); return b && b.score ? b.score : 0; };
+  app.bestScore = function (loan) { const b = CC.getSetting(app.bestKey(loan === undefined ? (app.s && app.s.loan) : loan)); return b && b.score ? b.score : 0; };
+  app.bestScores = function () { return CC.CONFIG.loanOrder.map(l => ({ loan: l, score: app.bestScore(l) })).filter(x => x.score); };
   app.ringDur = 1.6;
   app.ringing = function () { if (app.ring && app.t - app.ring.t0 >= app.ringDur) app.ring = null; return !!app.ring; };
   app.bankPay = function () {
@@ -804,7 +811,7 @@
       if (app.phase === 'gameover') UI.endPanel(app, ctx, false);
       if (app.phase === 'won') UI.endPanel(app, ctx, true);
     }
-    if (app.phase !== 'title') UI.confirmNewPanel(app, ctx);   // A8: Opnieuw beginnen (zondag na uitstel)
+    if (app.phase !== 'title') { UI.confirmNewPanel(app, ctx); UI.loanPanel(app, ctx); }   // A8: Opnieuw beginnen (zondag na uitstel); B5: lening kiezen
     if (CC.FX) CC.FX.drawParts(ctx, dt);   // deeltjes boven alles (muntjes, deurbel, vuurwerk)
     if (CC.FX) { if (app.phase === 'sale') CC.FX.drawCoins(ctx, dt); else if (CC.FX.flying.length) CC.FX.clearCoins(); }   // A10: munten naar de kas
     if (app.dialog) UI.textDialog(app, ctx);

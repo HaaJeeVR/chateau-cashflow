@@ -67,7 +67,15 @@
 
     // Economie (01_ONTWERP §3)
     rent: 20,                                               // vaste lasten per verkoopdag
-    repay: [90, 150, 240, 360, 520, 720, 1200, 2200],      // aflossing per zondag (week 1–8); besluit 70/72/76: zacht midden, steil einde (investeren en personeel betalen zich daar uit)
+    repay: [90, 150, 240, 360, 520, 720, 1200, 2200],      // = lening "normaal"
+    // B5: drie leningen; alleen de termijnen verschillen (×0,9 en ×1,12, afgerond op €10). Afgesteld op de alles-bot
+    // (300 runs): ruim 89 % · normaal 75 % · krap 50 %. normaal gebruikt altijd CONFIG.repay.
+    loans: {
+      ruim: { repay: [80, 140, 220, 320, 470, 650, 1080, 1980] },
+      normaal: {},
+      krap: { repay: [100, 170, 270, 400, 580, 810, 1340, 2460] },
+    },
+    loanOrder: ['ruim', 'normaal', 'krap'],      // aflossing per zondag (week 1–8); besluit 70/72/76: zacht midden, steil einde (investeren en personeel betalen zich daar uit)
     postponeFine: 100,                                      // uitstel: 1× per run, aflossing schuift door + boete
 
     // Advies (01_ONTWERP §7, besluit 36)

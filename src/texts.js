@@ -166,6 +166,16 @@
       liefhebber: { many: 'liefhebbers', one: 'liefhebber', want: 'wil kwaliteit: stevig, aromatisch, mineraal' },
       snob: { many: 'statuszoekers', one: 'statuszoeker', want: 'wil indruk maken: bubbels, elegant; wantrouwt alles onder €15' },
     },
+    // B5: drie leningen (zakelijke tekst, Claude)
+    loans: {
+      title: 'Welke lening?',
+      intro: 'De bank leent je het pand. Hoe zwaarder de termijnen, hoe minder ruimte voor fouten.',
+      ruim: { name: 'Ruim', desc: 'Lagere termijnen. Om rustig te leren.' },
+      normaal: { name: 'Normaal', desc: 'De lening zoals bedoeld.' },
+      krap: { name: 'Krap', desc: 'Zwaardere termijnen. Voor wie het spel kent.' },
+      first: 'eerste €{a}', last: 'laatste €{b}', total: 'totaal {t}', pick: 'Kies', back: 'Terug',
+      scoreRow: 'Lening', best: 'Beste score ({loan})',
+    },
     forecast: { title: 'Vandaag verwacht', total: '{n} klanten',
       offerTip: '{wine} staat in de aanbieding: {n} extra klanten vandaag, vooral koopjesjagers en buurtbewoners. Ze zitten in het totaal hierboven en kijken ook naar je andere flessen.' },
     orderNotice: {

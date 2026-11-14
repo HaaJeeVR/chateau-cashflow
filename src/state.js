@@ -14,7 +14,7 @@
     };
   };
 
-  CC.newState = function (seed) {
+  CC.newState = function (seed, loan) {
     if (seed == null) seed = (Math.random() * 1e9) >>> 0;
     const vakken = {};
     for (const f of CC.FURNITURE) if (f.vakken) for (const v of f.vakken) vakken[v] = { wine: null, n: 0 };
@@ -23,6 +23,7 @@
     return {
       v: 1,
       seed, rng: seed >>> 0,
+      loan: loan && CC.CONFIG.loans[loan] ? loan : 'normaal',   // B5
       cash: CC.CONFIG.startCash,
       week: 1, day: 0,          // day 0..5 = ma..za
       level: 1,                 // reputatieniveau (M3)
@@ -65,7 +66,7 @@
       const st = JSON.parse(s);
       if (!st || st.v !== 1) return null;
       // oudere saves aanvullen
-      const d = { dayBuy: 0, rep: 0, carry: 0, postponed: false, debtPaid: 0, status: 'playing', level: 1, weekBought: {}, adviceRecent: [], staff: {}, card: null, mishap: null, cardSeen: [], cardsTaken: [], targets: {}, bankDoneWeek: 0, sun: null, resultOpen: false, upgrades: { kast3: true, kast4: true, vitrine: !!st.vitrine }, vitrine: null };   // saves van vóór besluit 60 houden wat ze hadden
+      const d = { loan: 'normaal', dayBuy: 0, rep: 0, carry: 0, postponed: false, debtPaid: 0, status: 'playing', level: 1, weekBought: {}, adviceRecent: [], staff: {}, card: null, mishap: null, cardSeen: [], cardsTaken: [], targets: {}, bankDoneWeek: 0, sun: null, resultOpen: false, upgrades: { kast3: true, kast4: true, vitrine: !!st.vitrine }, vitrine: null };   // saves van vóór besluit 60 houden wat ze hadden
       for (const k in d) if (st[k] == null) st[k] = d[k];
       for (const f of CC.FURNITURE) if (f.vakken) for (const v of f.vakken) if (!st.vakken[v]) st.vakken[v] = { wine: null, n: 0 };
       // oude wijn-ID's (merken) omzetten naar types

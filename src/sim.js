@@ -129,7 +129,7 @@
     const L = C().levelRep, top = L[L.length - 1], B = C().repBonus;
     if (s.level < L.length) return { n: 0, at: null, next: null, max: B.max };
     const n = Math.min(B.max, Math.max(0, Math.floor((s.rep - top) / B.step)));
-    return { n, max: B.max, from: top + n * B.step, next: n < B.max ? top + (n + 1) * B.step : null, frac: n < B.max ? ((s.rep - top) % B.step) / B.step : 1 };
+    return { n, max: B.max, from: top + n * B.step, next: n < B.max ? top + (n + 1) * B.step : null, frac: n < B.max ? Math.max(0, (s.rep - top) % B.step) / B.step : 1 };   // max(0): oude saves op niveau 8 onder de nieuwe drempel
   };
   SIM.repCustomers = function (s) { return SIM.repBonus(s).n; };
 
@@ -861,7 +861,7 @@
   };
   SIM.planWeekKlus = function (s, week) {
     const W = CC.WEEKKLUS;
-    if (week < W.from || week > C().repay.length || (s.status !== 'playing' && s.status !== 'won')) return null;
+    if (week < W.from || week > SIM.repaySched(s).length || (s.status !== 'playing' && s.status !== 'won')) return null;
     const last = s.history.filter(h => h.week === week - 1);
     const rng = CC.makeRng({ rng: ((s.seed || 1) * 7919 + week * 104729) >>> 0 });
     const types = Object.keys(CC.CUSTOMER_TYPES).filter(k => CC.CUSTOMER_TYPES[k].minLevel <= s.level && k !== 'buurt');
@@ -964,17 +964,20 @@
   };
 
   // ---------- Zondag: de bank ----------
-  SIM.inLoan = function (s) { return s.week <= C().repay.length && s.status === 'playing'; };
+  // B5: termijnen van de gekozen lening
+  SIM.repaySched = function (s) { const L = s && C().loans && C().loans[s.loan]; return (L && L.repay) || C().repay; };
+  SIM.loanName = function (s) { return CC.TEXT.loans[(s && s.loan) || 'normaal'].name; };
+  SIM.inLoan = function (s) { return s.week <= SIM.repaySched(s).length && s.status === 'playing'; };
   // bankDoneWeek: deze zondag is al afgehandeld (betaald of uitgesteld). Dan staat er niets meer open,
   // ook niet na herladen; een uitgesteld bedrag (carry) telt pas vanaf volgende week.
   SIM.bankDone = function (s) { return s.bankDoneWeek === s.week; };
-  SIM.weekDue = function (s) { return SIM.inLoan(s) && !SIM.bankDone(s) ? C().repay[s.week - 1] + s.carry : 0; };
+  SIM.weekDue = function (s) { return SIM.inLoan(s) && !SIM.bankDone(s) ? SIM.repaySched(s)[s.week - 1] + s.carry : 0; };
   // B3: op koers? Gemiddelde winst per verkoopdag (na huur en loon) van deze week, of van vorige week zolang er deze
   // week nog niet verkocht is, tegenover wat de resterende termijnen per verkoopdag vragen bovenop de kas van nu.
   // Standen: ruim · krap · te weinig (CONFIG.koers). null buiten de lening of zonder verkoopdagen.
   SIM.onCourse = function (s) {
     if (!SIM.inLoan(s)) return null;
-    const D = C().daysPerWeek, K = C().koers, R = C().repay;
+    const D = C().daysPerWeek, K = C().koers, R = SIM.repaySched(s);
     let wk = s.history.filter(h => h.week === s.week);
     if (!wk.length) wk = s.history.filter(h => h.week === s.week - 1);
     if (!wk.length) return null;
@@ -992,7 +995,7 @@
     return { avg: Math.round(avg), need: Math.round(need), debt, terms: last - first, untilWeek: last, cash: s.cash, daysLeft, days: wk.length, ratio, state };
   };
   SIM.debtLeft = function (s) {
-    const R = C().repay; let left = s.carry;
+    const R = SIM.repaySched(s); let left = s.carry;
     for (let i = s.week - 1 + (SIM.bankDone(s) ? 1 : 0); i < R.length; i++) left += R[i];
     return s.status === 'playing' ? left : 0;
   };
@@ -1001,13 +1004,13 @@
     const due = SIM.weekDue(s);
     if (s.cash < due) return { ok: false, short: due - s.cash };
     s.cash -= due; s.debtPaid += due; s.carry = 0; s.bankDoneWeek = s.week;
-    if (s.week >= C().repay.length) s.status = 'won';
+    if (s.week >= SIM.repaySched(s).length) s.status = 'won';
     return { ok: true, paid: due, won: s.status === 'won' };
   };
   SIM.postpone = function (s) {
-    if (s.postponed || SIM.bankDone(s) || s.week >= C().repay.length) return { ok: false };
+    if (s.postponed || SIM.bankDone(s) || s.week >= SIM.repaySched(s).length) return { ok: false };
     s.carry = SIM.weekDue(s) + C().postponeFine; s.postponed = true; s.bankDoneWeek = s.week;
-    return { ok: true, next: C().repay[s.week] + s.carry };
+    return { ok: true, next: SIM.repaySched(s)[s.week] + s.carry };
   };
   SIM.bankrupt = function (s) { s.bust = { week: s.week, due: SIM.weekDue(s), cash: s.cash }; s.status = 'bankrupt'; };
   // Failliet: wat ging er mis? (fase 3d, besluit 77) Twee feitelijke regels over de laatste week, de zwaarste (in euro's) eerst.

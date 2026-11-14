@@ -1012,7 +1012,7 @@
     // schuldmeter
     if (s.status === 'endless') { F().draw(ctx, 'Lening afgelost', x + 190, y + 48, P.ink); HF().draw(ctx, 'Schuldenvrij ★', x + 190, y + 62, P.green2); }
     else {
-    const total = CC.CONFIG.repay.reduce((a, b) => a + b, 0);
+    const total = CC.SIM.repaySched(s).reduce((a, b) => a + b, 0);
     const paid = Math.min(total, s.debtPaid);
     F().draw(ctx, 'Lening afgelost', x + 190, y + 48, P.ink);
     R().round(ctx, x + 190, y + 60, 150, 9, 4, P.wood1); if (paid > 0) R().round(ctx, x + 191, y + 61, Math.max(7, Math.round(148 * paid / total)), 7, 3, P.green3);
@@ -1886,12 +1886,14 @@
       { l: CC.TEXT.weekKlus.scoreRow, d: String(s.weekKlusDone || 0), p: (s.weekKlusDone || 0) * 50 },   // B1: 50 punten per gehaalde weekklus
       { l: 'Zonder uitstel', d: s.postponed ? 'nee' : 'ja', p: s.postponed ? 0 : 250 },
     ];
+    // B5: de lening staat erbij (geen punten; de beste score geldt per lening)
+    rows.unshift({ l: CC.TEXT.loans.scoreRow, d: CC.SIM.loanName(s), p: 0, info: true });
     return { rows, total: rows.reduce((a, r) => a + r.p, 0) };
   };
   UI.wonPanel = function (app, ctx, t) {
     const s = app.s, feest = app.images.schuldenvrij;
     UI.dim(app, ctx, feest && feest.complete && feest.naturalWidth ? 0.25 : 0.55);   // het feestbeeld minder dimmen
-    const w = 400, h = 308, x = 120, y = 24;   // A7/B1: ruimte voor de beste score en de regel weekklussen
+    const w = 400, h = 320, x = 120, y = 20;   // A7/B1/B5: ruimte voor de beste score, de weekklussen en de lening
     UI.rays(ctx, 320, y + 30, 320, app.t, 0.15 * Math.min(1, t / 0.5));
     UI.celebrate(app, x + 10, x + w - 10, y - 10);
     const pop = Math.min(1, t / 0.25), yy0 = y + Math.round((1 - pop) * 24);
@@ -1917,7 +1919,7 @@
       if (k <= 0) { ry += rowH; return; }
       F().draw(ctx, r.l, bx + 9, ry, P.ink);
       F().draw(ctx, r.d, bx + 130, ry, P.wood2, { align: 'right' });
-      F().draw(ctx, '+' + Math.round(r.p * k).toLocaleString('nl-NL'), bx + bw - 9, ry, r.p ? P.green2 : P.stone2, { align: 'right' });
+      if (!r.info) F().draw(ctx, '+' + Math.round(r.p * k).toLocaleString('nl-NL'), bx + bw - 9, ry, r.p ? P.green2 : P.stone2, { align: 'right' });
       ry += rowH;
     });
     for (let i = 8; i < bw - 8; i += 4) R().rect(ctx, bx + i, ry + 1, 2, 1, P.stone2);
@@ -1929,12 +1931,12 @@
     // A7: beste score (bewaard in de instellingen); nieuw record krijgt een gouden pil
     if (kt >= 1) {
       const prev = app.prevBest || 0, rec = sc.total > prev;
-      const txt = rec ? (prev ? `Nieuw record! (was ${prev.toLocaleString('nl-NL')})` : 'Je eerste score') : `beste: ${Math.max(prev, app.bestScore()).toLocaleString('nl-NL')}`;
+      const ln = CC.SIM.loanName(s).toLowerCase(), txt = rec ? (prev ? `Nieuw record, lening ${ln}! (was ${prev.toLocaleString('nl-NL')})` : `Je eerste score, lening ${ln}`) : `beste met lening ${ln}: ${Math.max(prev, app.bestScore()).toLocaleString('nl-NL')}`;
       if (rec) { const pw = F().width(txt) + 14; R().pill(ctx, bx + bw / 2 - pw / 2, ry + 22, pw, 12, P.gold, P.ink); }
       F().draw(ctx, txt, bx + bw / 2, ry + 24, rec ? P.ink : P.stone1, { align: 'center' });
     }
     if (t > 0.6 + sc.rows.length * 0.3 + 0.6) {
-      UI.btn(app, ctx, 'replay', 320 - 146, yy0 + h - 30, 140, 20, 'Opnieuw spelen', () => app.newGame(), { tone: 'wood', tip: 'Een nieuwe run van 8 weken' });
+      UI.btn(app, ctx, 'replay', 320 - 146, yy0 + h - 30, 140, 20, 'Opnieuw spelen', () => app.askLoan(), { tone: 'wood', tip: 'Een nieuwe run van 8 weken' });
       UI.btn(app, ctx, 'endless', 320 + 6, yy0 + h - 30, 140, 20, 'Verder spelen ▶', () => app.bankNextWeek(), { tone: 'bord', tip: 'Vrij doorspelen met deze winkel' });
     }
   };
@@ -2020,8 +2022,8 @@
       R().rect(ctx, 0, 286, 640, 74, 'rgba(31,10,14,0.72)');
       R().rect(ctx, 0, 286, 640, 1, P.wood2);
       F().draw(ctx, CC.TEXT.tagline, 320, 294, P.cream2, { align: 'center', shadow: P.ink });
-      const best = app.bestScore && app.bestScore();   // A7
-      if (best) F().draw(ctx, `Beste score: ${best.toLocaleString('nl-NL')}`, 10, 347, P.gold, { shadow: P.ink });
+      const bests = app.bestScores ? app.bestScores() : [];   // A7, B5: per lening
+      if (bests.length) F().draw(ctx, 'Beste score: ' + bests.map(b => `${CC.TEXT.loans[b.loan].name.toLowerCase()} ${b.score.toLocaleString('nl-NL')}`).join(' · '), 10, 347, P.gold, { shadow: P.ink });
       if (app.hasSave) {
         UI.btn(app, ctx, 'cont', 176, 312, 136, 22, 'Doorgaan', () => app.continueGame(), { tone: 'bord' });
         UI.btn(app, ctx, 'new', 328, 312, 136, 22, 'Nieuw spel', () => app.askNewGame(), { tone: 'wood' });
@@ -2030,6 +2032,7 @@
       UI.fsButton(app, ctx, 634, 6, true);
       UI.fbButton(app, ctx, 6, 6, true);
       UI.confirmNewPanel(app, ctx);
+      UI.loanPanel(app, ctx);
       return;
     }
     R().rect(ctx, 0, 0, 640, 360, 'rgba(31,10,14,0.62)');
@@ -2042,6 +2045,7 @@
     UI.titleFooter(app, ctx, 342);
     UI.fsButton(app, ctx, 634, 6, true);
     UI.confirmNewPanel(app, ctx);
+    UI.loanPanel(app, ctx);
   };
 
   // Onderste regel van het titelscherm: versie links, spelcode en reservekopie rechts (klein, rustig).
@@ -2122,7 +2126,34 @@
     const lines = F().wrap(`Je spel in week ${o.week || 1} (niveau ${o.level || 1}, kas ${R().euro(o.cash || 0)}) wordt vervangen. Het blijft bewaard als reservekopie; die kun je hier later terugzetten.`, w - 40);
     lines.forEach((l, i) => F().draw(ctx, l, x + w / 2, y + 40 + i * 10, P.ink, { align: 'center' }));
     UI.btn(app, ctx, 'confirm_no', x + 24, y + h - 32, 104, 20, 'Terug', () => { app.confirmNew = false; }, { tone: 'wood' });
-    UI.btn(app, ctx, 'confirm_yes', x + w - 128, y + h - 32, 104, 20, 'Ja, nieuw spel', () => app.newGame(), { tone: 'bord' });
+    UI.btn(app, ctx, 'confirm_yes', x + w - 128, y + h - 32, 104, 20, 'Ja, nieuw spel', () => app.askLoan(), { tone: 'bord' });
+  };
+  // B5: welke lening? Drie kaarten naast elkaar; alleen de termijnen verschillen.
+  UI.loanPanel = function (app, ctx) {
+    if (!app.loanPick) return;
+    const T = CC.TEXT.loans;
+    R().rect(ctx, 0, 0, 640, 360, 'rgba(31,10,14,0.6)');
+    UI.hit(app, 'loan_block', 0, 0, 640, 360, () => {}, null);
+    const w = 440, h = 196, x = 100, y = 70;
+    R().panel(ctx, x, y, w, h);
+    HF().draw(ctx, T.title, x + w / 2, y + 14, P.bord2, { align: 'center' });
+    F().wrap(T.intro, w - 40).forEach((l, i) => F().draw(ctx, l, x + w / 2, y + 34 + i * 10, P.stone1, { align: 'center' }));
+    const last = CC.getSetting('lastLoan') || 'normaal';
+    CC.CONFIG.loanOrder.forEach((id, i) => {
+      const L = CC.CONFIG.loans[id], sched = (L && L.repay) || CC.CONFIG.repay, cw = 128, cx = x + 16 + i * (cw + 8), cy = y + 58;
+      const tot = sched.reduce((a, b) => a + b, 0), hv = UI.hit(app, 'loan_card_' + id, cx, cy, cw, 104, () => app.newGame(id), null);
+      R().round(ctx, cx, cy, cw, 104, 6, P.ink);
+      R().round(ctx, cx + 1, cy + 1, cw - 2, 102, 5, hv ? P.cream3 : P.cream2);
+      if (id === last) R().rect(ctx, cx + 6, cy + 4, cw - 12, 1, P.gold);
+      HF().draw(ctx, T[id].name, cx + cw / 2, cy + 8, id === 'krap' ? P.bord2 : id === 'ruim' ? P.green2 : P.ink, { align: 'center' });
+      F().wrap(T[id].desc, cw - 14).slice(0, 2).forEach((l, k) => F().draw(ctx, l, cx + cw / 2, cy + 26 + k * 10, P.ink, { align: 'center' }));
+      F().draw(ctx, `${R().euro(sched[0])} … ${R().euro(sched[sched.length - 1])}`, cx + cw / 2, cy + 52, P.wood2, { align: 'center' });
+      F().draw(ctx, T.total.split('{t}').join(R().euro(tot)), cx + cw / 2, cy + 62, P.stone1, { align: 'center' });
+      const best = app.bestScore(id);
+      if (best) F().draw(ctx, `beste ${best.toLocaleString('nl-NL')}`, cx + cw / 2, cy + 72, P.gold, { align: 'center' });
+      UI.btn(app, ctx, 'loan_' + id, cx + 24, cy + 82, cw - 48, 16, T.pick, () => app.newGame(id), { tone: id === last ? 'bord' : 'wood', tip: 'Termijnen: ' + sched.map(v => R().euro(v)).join(' · ') });
+    });
+    UI.btn(app, ctx, 'loan_back', x + w / 2 - 50, y + h - 28, 100, 18, T.back, () => { app.loanPick = false; }, { tone: 'wood', tip: 'Esc' });
   };
 
   // ---------- Middenvenster "Bestellen · Prijzen" (besluit 66/69) ----------

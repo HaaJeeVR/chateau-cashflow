@@ -343,7 +343,7 @@ function botMishap(s, rng, e, lastSold) {
 
 let KOERS = {}; let STAT;
 function run(botName, seed) {
-  const s = CC.newState(seed); const bot = BOTS[botName];
+  const s = CC.newState(seed, process.env.LOAN || 'normaal'); const bot = BOTS[botName];   // B5: LOAN=ruim|normaal|krap
   let lastSold = {}, w1min = Infinity;
   while (s.status === 'playing') {
     const e = est(s);
@@ -378,7 +378,7 @@ function run(botName, seed) {
   }
 }
 
-console.log(`Balans: ${RUNS} runs per bot · start €${C.startCash} · aflossing ${C.repay.join('/')} · huur €${C.rent}/dag${OLDCARDS ? ' · oude kaartkeuze' : ''}\n`);
+console.log(`Balans: ${RUNS} runs per bot · start €${C.startCash} · lening ${process.env.LOAN || 'normaal'} · aflossing ${((C.loans[process.env.LOAN] || {}).repay || C.repay).join('/')} · huur €${C.rent}/dag${OLDCARDS ? ' · oude kaartkeuze' : ''}\n`);
 console.log('bot        winst%  eindkas(med)  niveau(med)  failliet in week (verdeling)');
 const ONLY = process.env.BOTS ? process.env.BOTS.split(',') : Object.keys(BOTS);
 for (const name of ONLY) {

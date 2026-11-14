@@ -190,6 +190,9 @@ const server = http.createServer((req, res) => {
   await winSetup(); await wait(5500);
   check('lagere score overschrijft de beste niet', (await ev(() => CC.getSetting('bestScore').score)) === 99999);
   await click('replay');
+  check('B5: "Opnieuw spelen" vraagt eerst welke lening', await ev(() => app.loanPick === true));
+  await click('loan_krap');
+  check('B5: gekozen lening staat in het spel', await ev(() => app.s.loan === 'krap' && CC.SIM.weekDue(app.s) === CC.CONFIG.loans.krap.repay[0]));
   check('"Opnieuw spelen" start een nieuw spel', (await ev(() => app.phase === 'prep' && app.s.week === 1 && app.s.day === 0 && app.s.status === 'playing')));
   await ev(() => { while (app.notice) app.closeNotice(); app.setPhase('title'); app.hasSave = CC.hasSave(); });
   await wait(300); await shot('A7-titel-beste');
@@ -206,7 +209,7 @@ const server = http.createServer((req, res) => {
   await shot('A8-bevestigen');
   await click('confirm_no');
   check('Terug: niets veranderd', (await ev(() => !app.confirmNew && app.s.week === 3 && app.phase === 'sunday')));
-  await click('restart_ask'); await click('confirm_yes');
+  await click('restart_ask'); await click('confirm_yes'); await click('loan_normaal');
   check('Ja: nieuw spel in week 1, oude als reservekopie', (await ev(() => app.s.week === 1 && app.phase === 'prep' && CC.hasBackup() && CC.backupInfo().week === 3)));
   await ev(() => { while (app.notice) app.closeNotice(); });
 
