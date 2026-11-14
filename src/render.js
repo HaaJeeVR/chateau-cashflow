@@ -900,7 +900,7 @@
     const x = Math.round(sx - w / 2), y = Math.round(sy0 - h + 1 - step);
     // D3: na het afrekenen een tasje (1 fles, 2 flessen) of een doos (vanaf CONFIG.boxFromQty) mee naar buiten.
     // Een doos zit vóór het lijf: van achteren gezien tekenen we hem eerst, zodat de figuur ervoor staat.
-    const bagQty = (c.want && c.want.qty) || 1, bagBack = !!(c.bag && !c.staff && CC.OBJ);
+    const bagQty = (c.want && c.want.qty) || 1, bagBack = !!(CC.CONFIG.carryBags && c.bag && !c.staff && CC.OBJ);
     const drawBag = () => {
       const qty = bagQty, kind = qty >= (CC.CONFIG.boxFromQty || 4) ? 'doos6' : qty >= 2 ? 'tas2' : 'tas1', ob = images['obj_' + kind];
       if (ready(ob)) {

@@ -53,9 +53,11 @@
     pricePenaltyMul: 3,
     offerAppeal: 0.3,       // 14_PRIJZEN: hoe sterk een aanbieding de wijn zelf aantrekkelijker maakt (1 = zoals scherp vroeger)
     whatIfMin: 0.10, whatIfMinEuro: 5,   // 14_PRIJZEN §3.2: wat-als-regel alleen bij minstens 10 % van de dagmarge (en €5)
+    whatIfRuns: 8, whatIfPos: 6, whatIfMemory: 3,   // review 3: 8 keer naspelen, in 6 van de 8 beter, niet terugdraaien binnen 3 dagen
     fatimaReach: 0.8,       // 14_PRIJZEN: Fatima haalt alleen terug wie hoogstens zoveel onder de koopdrempel zit
     qtyWeights: [[1, 50], [2, 33], [3, 17]],
     repBonus: { step: 220, max: 6 },   // B4: boven niveau 8 elke 220 reputatie +1 klant per dag, tot +6 (handoff: 150 bij drempel 650; meegeschaald met 950)
+    carryBags: false,   // review 3: tasje en doos na het afrekenen uit (in een drukke winkel onvindbaar); assets blijven staan
     boxFromQty: 3,
     koers: { ruim: 1.25, krap: 0.9, weeks: 2 },   // B3: op-koers-meter, gemiddelde winst/dag gedeeld door wat de resterende termijnen per dag vragen   // D3: vanaf zoveel flessen gaat de klant met een doos naar buiten i.p.v. een tasje (alleen beeld)
     secondChoice: 0.5,      // kans dat een klant bij een uitverkochte favoriet zijn tweede keus pakt

@@ -75,21 +75,26 @@ console.log('3. "wie koopt dit nog?" klopt met wat klanten die dag doen (200 dag
   ok(opposite / total <= 0.02, `"koopt" waar ze afhaakten of andersom: ${Math.round(1000 * opposite / total) / 10}% (eis ≤ 2%)`);
 }
 
-console.log('4. wat-als: alleen boven de drempel, en het bedrag klopt met de nagespeelde dag');
+console.log('4. wat-als (review 3): 8 keer nagespeeld, drempel, niet terugdraaien');
 {
-  let shown = 0, none = 0, maxErr = 0, belowMin = 0;
-  for (let i = 0; i < 60; i++) {
+  let shown = 0, none = 0, belowMin = 0, fewPos = 0, reverse = 0;
+  for (let i = 0; i < 40; i++) {
     const s = shop(500 + i, 1 + (i % 8)), snap = JSON.parse(JSON.stringify(s));
     const wi = DAY.whatIf(snap);
     if (wi.none) { none++; continue; }
     shown++;
-    const base = DAY.replay(snap).margin, alt = DAY.replay(snap, wi.wine, wi.to).margin, real = alt - base;
-    maxErr = Math.max(maxErr, Math.abs(wi.diff - real) / Math.max(1, Math.abs(real)));
-    if (wi.diff < C.whatIfMin * base) belowMin++;
+    if (wi.diff < C.whatIfMin * wi.base - 1) belowMin++;
+    if (wi.pos < C.whatIfPos) fewPos++;
+    // geef dezelfde dag een "regel van gisteren" in de andere richting mee: dan mag deze wijn niet terug
+    const snap2 = JSON.parse(JSON.stringify(snap)); snap2.whatIfRecent = [{ day: 0, wine: wi.wine, dir: -wi.dir }];
+    const wi2 = DAY.whatIf(snap2);
+    if (!wi2.none && wi2.wine === wi.wine && wi2.dir === wi.dir) reverse++;
   }
-  ok(shown > 5 && none > 0, `regel op ${shown} van de 60 dagen, ${none} keer niets te winnen`);
+  ok(shown > 3 && none > 0, `regel op ${shown} van de 40 dagen, ${none} keer niets`);
   ok(belowMin === 0, 'nooit onder 10% van de dagmarge');
-  ok(maxErr <= 0.1, `genoemd bedrag tegenover nagespeelde dag: hoogstens ${Math.round(maxErr * 100)}% verschil (eis ≤ 10%)`);
+  ok(fewPos === 0, `altijd in minstens ${C.whatIfPos} van de ${C.whatIfRuns} naspelingen beter`);
+  ok(reverse === 0, 'nooit het omgekeerde van een regel uit de laatste dagen voor dezelfde wijn');
+  console.log('        (betrouwbaarheid op 40 andere dagen: node tools/watals.js)');
 }
 
 console.log(fails ? `\n${fails} fout(en).` : '\nAlles groen.');

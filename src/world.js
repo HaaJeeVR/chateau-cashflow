@@ -405,19 +405,30 @@
     while (!d.done && guard++ < 60 * 120) DAY.step(d, s, DAY.STEP);
   };
 
-  // 14_PRIJZEN §3.2: wat als? Speel de dag opnieuw vanaf de beginstand (snap) met dezelfde klanten en dezelfde
-  // toevalsreeks, per wijn één stand hoger en één lager. Basis = dezelfde dag met jouw prijzen, ook nagespeeld (zonder
-  // jouw adviesklikken), zodat het verschil alleen de prijs is. Geeft de wijn met het grootste verschil, alleen als dat
-  // minstens CONFIG.whatIfMin van de dagmarge is; anders { none: true }.
-  DAY.replay = function (snap, wineId, standId) {
+  // 14_PRIJZEN §3.2, review 3: wat als? Speel de dag opnieuw vanaf de beginstand (snap), per wijn één stand hoger en
+  // één lager, elk K keer met een andere toevalsreeks (andere klanten en andere keuzes), gepaard met K keer de basis
+  // (dezelfde reeksen, jouw prijzen, zonder jouw adviesklikken). Een regel alleen als het gemiddelde verschil ≥ whatIfMin
+  // van de dagmarge (en ≥ whatIfMinEuro) is én het verschil in minstens whatIfPos van de K keer positief is. Nooit het
+  // omgekeerde van een regel uit de laatste whatIfMemory dagen voor dezelfde wijn (snap.whatIfRecent).
+  // Rekenen gebeurt als generator (DAY.whatIfJob), zodat main.js het over beeldjes kan verdelen; DAY.whatIf rekent alles
+  // in één keer (tools en tests).
+  DAY.REPLAY_STEP = 1 / 30;   // naspelen met halve stapgrootte: 2× zo snel; verschillen blijven gepaard vergeleken
+  DAY.replay = function (snap, wineId, standId, k) {
     const t = JSON.parse(JSON.stringify(snap));
+    if (k) { t.seed = (snap.seed + 7919 * k) >>> 0; t.rng = (snap.rng + 104729 * k) >>> 0; }
     if (wineId) SIM().setPrice(t, wineId, standId);
-    const d = DAY.start(t); DAY.finish(d, t);
+    const d = DAY.start(t);
+    let guard = 0; d.speed = 1;
+    while (!d.done && guard++ < 60 * 120) DAY.step(d, t, k == null ? DAY.STEP : DAY.REPLAY_STEP);
     return { margin: d.log.revenue - d.log.cogs, customers: d.log.customers, buyers: d.log.buyers };
   };
-  DAY.whatIf = function (snap) {
-    const S = SIM(), order = CC.CONFIG.priceStands.map(x => x.id);
-    const base = DAY.replay(snap);
+  DAY.whatIfJob = function* (snap) {
+    const S = SIM(), C = CC.CONFIG, K = C.whatIfRuns || 8, need = C.whatIfPos || 6, order = C.priceStands.map(x => x.id);
+    const recent = snap.whatIfRecent || [];
+    const base = [];
+    for (let k = 1; k <= K; k++) { base.push(DAY.replay(snap, null, null, k)); yield; }
+    const baseMean = base.reduce((a, r) => a + r.margin, 0) / K;
+    const min = Math.max(C.whatIfMinEuro || 0, (C.whatIfMin || 0.1) * Math.max(0, baseMean));
     let best = null;
     const seen = new Set();
     for (const L of S.listed(snap)) {
@@ -425,16 +436,41 @@
       const i = order.indexOf(snap.prices[id]);
       for (const j of [i - 1, i + 1]) {
         if (j < 0 || j >= order.length) continue;
-        const alt = DAY.replay(snap, id, order[j]);
-        const diff = alt.margin - base.margin;
-        const moved = order[j] === 'aanbieding' ? Object.keys(snap.prices).find(k => k !== id && snap.prices[k] === 'aanbieding') || null : null;
-        if (!best || diff > best.diff) best = { wine: id, from: snap.prices[id], to: order[j], diff, extra: alt.customers - base.customers, moved };
+        const dir = Math.sign(j - i);
+        if (recent.some(r => r.wine === id && r.dir === -dir)) continue;   // nooit terugdraaien wat we net adviseerden
+        let pos = 0, neg = 0, sum = 0, cust = 0;
+        for (let k = 1; k <= K; k++) {
+          const alt = DAY.replay(snap, id, order[j], k), d = alt.margin - base[k - 1].margin;
+          sum += d; cust += alt.customers - base[k - 1].customers; if (d > 0) pos++; else neg++;
+          yield;
+          if (neg > K - need) break;   // haalt de 6 van 8 niet meer
+        }
+        if (neg > K - need) continue;
+        const mean = sum / K;
+        if (mean >= min && (!best || mean > best.diff)) {
+          const moved = order[j] === 'aanbieding' ? Object.keys(snap.prices).find(k2 => k2 !== id && snap.prices[k2] === 'aanbieding') || null : null;
+          best = { wine: id, from: snap.prices[id], to: order[j], dir, diff: mean, extra: Math.round(cust / K), moved, pos };
+        }
       }
     }
-    const min = Math.max(CC.CONFIG.whatIfMinEuro || 0, (CC.CONFIG.whatIfMin || 0.1) * Math.max(0, base.margin));
-    if (!best || best.diff < min) return { none: true, base: Math.round(base.margin) };
-    best.diff = Math.round(best.diff); best.base = Math.round(base.margin);
+    if (!best) return { none: true, base: Math.round(baseMean) };
+    // de winnaar opnieuw meten op K verse reeksen: wie de beste van 16 kiest, overschat hem (winner's curse).
+    // Het bedrag dat we noemen komt uit deze tweede meting, en ook die moet de drempel halen.
+    let sum2 = 0, pos2 = 0, base2 = 0;
+    for (let k = K + 1; k <= 2 * K; k++) {
+      const b0 = DAY.replay(snap, null, null, k), a1 = DAY.replay(snap, best.wine, best.to, k), d = a1.margin - b0.margin;
+      sum2 += d; base2 += b0.margin; if (d > 0) pos2++;
+      yield;
+    }
+    const mean2 = sum2 / K, min2 = Math.max(C.whatIfMinEuro || 0, (C.whatIfMin || 0.1) * Math.max(0, base2 / K));
+    if (mean2 < min2 || pos2 < need - 1) return { none: true, base: Math.round(baseMean), dropped: best.wine };
+    best.diff = Math.round(mean2); best.base = Math.round((baseMean + base2 / K) / 2);
     return best;
+  };
+  DAY.whatIf = function (snap) {
+    const g = DAY.whatIfJob(snap); let r;
+    do { r = g.next(); } while (!r.done);
+    return r.value;
   };
 
   CC.DAY = DAY;

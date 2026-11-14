@@ -448,6 +448,7 @@
     }
     app.panel = null; app.phase = 'sale'; app.speed = app.speed || 1; app.acc = 0;
     app.s.flags.opened = true;
+    if (app.whatIfRun) app.whatIfTick(0, true);   // nog niet klaar met gisteren (zeldzaam): eerst afmaken
     app.daySnap = JSON.parse(JSON.stringify(app.s));   // 14_PRIJZEN §3.2: beginstand van de dag, voor de wat-als-regel
     app.day = DAY.start(app.s);
     app.day.visual = true;
@@ -470,9 +471,8 @@
   function endDay() {
     app.advice = null;
     app.summary = SIM.endDay(app.s, app.day.log);
-    if (app.daySnap && DAY.whatIf) { try { app.summary.whatIf = DAY.whatIf(app.daySnap); } catch (e) { app.summary.whatIf = null; } }
-    // "je prijzen stonden goed" hoogstens eens per week
-    if (app.summary.whatIf && app.summary.whatIf.none && app.s.priceOkWeek !== app.s.week) { app.summary.priceOk = true; app.s.priceOkWeek = app.s.week; }
+    // review 3: de wat-als-regel wordt over de volgende beeldjes uitgerekend (app.whatIfTick), zodat sluiten direct gaat
+    if (app.daySnap && DAY.whatIfJob) app.whatIfRun = { gen: DAY.whatIfJob(app.daySnap), sm: app.summary };
     app.daySnap = null;
     app.s.resultOpen = true;   // herladen op de bon = dezelfde bon, geen herhaling van de dag
     app.phase = 'result'; app.resultT = 0;
@@ -745,8 +745,28 @@
   let lastPhase = null;
   const TOUCH_TIP = /^(pr_|klus_|bh_|bb_|fc_|tut_)/;   // A9: elementen waar de tooltip nieuwe informatie geeft
 
+  // review 3: wat-als in stukjes van hoogstens ± 6 ms per beeldje; het resultaat komt in het dagrapport (en in "Gisteren")
+  app.whatIfDone = function (sm, wi) {
+    sm.whatIf = wi;
+    const s = app.s, day = s.totals.days, keep = CC.CONFIG.whatIfMemory || 3;
+    s.whatIfRecent = (s.whatIfRecent || []).filter(r => day - r.day < keep);
+    if (wi && !wi.none) s.whatIfRecent.push({ day, wine: wi.wine, dir: wi.dir });
+    // "je prijzen stonden goed" hoogstens eens per week
+    if (wi && wi.none && s.priceOkWeek !== s.week) { sm.priceOk = true; s.priceOkWeek = s.week; }
+    app.save();
+  };
+  app.whatIfTick = function (budgetMs, all) {
+    const run = app.whatIfRun; if (!run) return;
+    const t0 = performance.now();
+    try {
+      let r;
+      do { r = run.gen.next(); } while (!r.done && (all || performance.now() - t0 < budgetMs));
+      if (r.done) { app.whatIfRun = null; app.whatIfDone(run.sm, r.value); }
+    } catch (e) { app.whatIfRun = null; run.sm.whatIf = null; }
+  };
   function frame(dt) {
     app.t += dt;
+    app.whatIfTick(6);
     DBG.tick(dt);
     if (app.phase !== lastPhase) { lastPhase = app.phase; document.body.classList.toggle('intro', app.phase === 'intro'); }
     if (app.phase === 'intro') {
