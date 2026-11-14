@@ -100,11 +100,19 @@
     const c = C();
     const j = Math.round((rng() * 2 - 1) * c.customersJitter);
     const semLv = SIM.staffLevel ? SIM.staffLevel(s, 'sem') : 0;
-    const sem = semLv ? c.semCustomers[semLv - 1] : 0, upg = SIM.upgradeCustomers(s);
-    const raw = Math.max(1, c.customersBase + c.customersPerLevel * (s.level - 1) + j + sem + upg);
+    const sem = semLv ? c.semCustomers[semLv - 1] : 0, upg = SIM.upgradeCustomers(s), rep = SIM.repCustomers(s);
+    const raw = Math.max(1, c.customersBase + c.customersPerLevel * (s.level - 1) + j + sem + upg + rep);
     const n = SIM.cardCustomers(s, raw), k = raw ? n / raw : 0;
-    return { n, sem: Math.round(sem * k), upg: Math.round(upg * k) };
+    return { n, sem: Math.round(sem * k), upg: Math.round(upg * k), rep: Math.round(rep * k) };
   };
+  // B4: reputatie blijft tellen na niveau 8: elke repBonus.step boven de drempel van niveau 8 = +1 klant per dag
+  SIM.repBonus = function (s) {
+    const L = C().levelRep, top = L[L.length - 1], B = C().repBonus;
+    if (s.level < L.length) return { n: 0, at: null, next: null, max: B.max };
+    const n = Math.min(B.max, Math.max(0, Math.floor((s.rep - top) / B.step)));
+    return { n, max: B.max, from: top + n * B.step, next: n < B.max ? top + (n + 1) * B.step : null, frac: n < B.max ? ((s.rep - top) % B.step) / B.step : 1 };
+  };
+  SIM.repCustomers = function (s) { return SIM.repBonus(s).n; };
 
   SIM.pickType = function (s, rng) {
     const types = Object.keys(CC.CUSTOMER_TYPES).filter(k => CC.CUSTOMER_TYPES[k].minLevel <= s.level);
@@ -122,14 +130,15 @@
     const plan = SIM.planDay(s, SIM.dayRng(s));
     const counts = {};
     for (const p of plan) counts[p.type] = (counts[p.type] || 0) + 1;
-    return { total: plan.length, counts };
+    const rep = plan.filter(p => p.src === 'rep').length;
+    return { total: plan.length, counts, rep };
   };
 
   SIM.planDay = function (s, rng) {
     const parts = SIM.customerParts(s, rng), n = parts.n;
     // extra klanten (Sem, investeringen) gelijkmatig over de dag verdelen
-    const src = {}, extra = Math.min(n, parts.sem + parts.upg);
-    for (let e = 0; e < extra; e++) src[Math.min(n - 1, Math.floor((e + 0.5) * n / extra))] = e < parts.sem ? 'sem' : 'upg';
+    const src = {}, extra = Math.min(n, parts.sem + parts.upg + parts.rep);
+    for (let e = 0; e < extra; e++) src[Math.min(n - 1, Math.floor((e + 0.5) * n / extra))] = e < parts.sem ? 'sem' : e < parts.sem + parts.upg ? 'upg' : 'rep';
     const list = [];
     for (let i = 0; i < n; i++) {
       const type = SIM.pickType(s, rng);

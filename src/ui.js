@@ -187,11 +187,21 @@
       UI.hit(app, 'hud_due', 194, 0, 120, 16, null, tip);
     } else if (s.status === 'endless') F().draw(ctx, 'Schuldenvrij', 196, 4, P.green4);
     // reputatie
-    const rp = CC.SIM.repProgress(s);
+    const rp = CC.SIM.repProgress(s), rb = CC.SIM.repBonus(s);
     F().draw(ctx, `Niv ${rp.lv}`, 318, 4, P.gold);
-    R().rect(ctx, 346, 5, 42, 7, P.wood1);
-    R().rect(ctx, 347, 6, Math.round(40 * rp.frac), 5, P.gold);   // goud: rood is alleen voor "fout" (02_ART §4)
-    UI.hit(app, 'hud_rep', 316, 0, 76, 16, null, rp.next ? `Reputatie ${s.rep} · niveau ${rp.lv + 1} bij ${rp.next}` : `Reputatie ${s.rep} · hoogste niveau`);
+    if (rp.next) {
+      R().rect(ctx, 346, 5, 42, 7, P.wood1);
+      R().rect(ctx, 347, 6, Math.round(40 * rp.frac), 5, P.gold);   // goud: rood is alleen voor "fout" (02_ART §4)
+      UI.hit(app, 'hud_rep', 316, 0, 76, 16, null, `Reputatie ${s.rep} · niveau ${rp.lv + 1} bij ${rp.next}`);
+    } else {
+      // B4: boven niveau 8 vult de balk naar de volgende extra klant; ernaast de teller (+n en een sterretje)
+      R().rect(ctx, 346, 5, 28, 7, P.wood1);
+      R().rect(ctx, 347, 6, Math.round(26 * rb.frac), 5, rb.next ? P.gold : P.green3);
+      const t = `+${rb.n}`;
+      F().draw(ctx, t, 377, 4, rb.n ? P.gold2 : P.stone2);
+      UI.miniStar(ctx, 379 + F().width(t), 5, rb.n ? P.gold2 : P.stone2);
+      UI.hit(app, 'hud_rep', 316, 0, 76, 16, null, `Reputatie ${s.rep} · hoogste niveau. Elke ${CC.CONFIG.repBonus.step} reputatie daarboven trekt 1 klant per dag extra (max ${rb.max}). Nu +${rb.n}` + (rb.next ? `; de volgende bij ${rb.next}.` : '; het maximum.'));
+    }
     // opslaan mislukt: blijvende melding, klik = spelcode bewaren
     if (app.saveFailed) {
       const lbl = '! Niet opgeslagen', w = F().width(lbl) + 10;
@@ -283,7 +293,28 @@
       F().draw(ctx, `€${ct.budget[0]}-${ct.budget[1]}`, x + w - 6, yy, P.stone2, { align: 'right' });
       yy += 12;
     }
-    UI.klusBoard(app, ctx, y + h + 5);
+    UI.klusBoard(app, ctx, y + h + 5 + UI.forecastExtra(app, ctx, x, y + h + 2, w, fc));
+  };
+  // B4: extra regels onder "Vandaag verwacht" (klanten die je reputatie boven niveau 8 trekt). Geeft de hoogte terug.
+  UI.forecastExtra = function (app, ctx, x, y, w, fc) {
+    const rows = [];
+    if (fc.rep) { const rb = CC.SIM.repBonus(app.s); rows.push({ id: 'fc_rep', txt: `+${fc.rep} door je reputatie`, star: true,
+      tip: `Boven niveau 8 trekt elke ${CC.CONFIG.repBonus.step} reputatie 1 klant per dag extra (max ${rb.max}). Ze zitten in het totaal hierboven.` + (rb.next ? ` Volgende bij ${rb.next} (nu ${app.s.rep}).` : '') }); }
+    if (!rows.length) return 0;
+    const h = rows.length * 12 + 4;
+    R().round(ctx, x, y, w, h, 5, 'rgba(31,10,14,0.85)');
+    rows.forEach((r, i) => {
+      const yy = y + 3 + i * 12;
+      const hv = UI.hit(app, r.id, x + 3, yy - 1, w - 6, 12, null, r.tip);
+      if (hv) R().round(ctx, x + 3, yy - 1, w - 6, 12, 3, 'rgba(232,181,58,0.18)');
+      if (r.star) UI.miniStar(ctx, x + 8, yy + 1, P.gold2);
+      F().draw(ctx, r.txt, x + 18, yy + 1, P.gold2);
+    });
+    return h + 2;
+  };
+  // klein sterretje van 7 × 7 (alleen paletkleuren)
+  UI.miniStar = function (ctx, x, y, col) {
+    R().rect(ctx, x + 3, y, 1, 7, col); R().rect(ctx, x, y + 2, 7, 2, col); R().rect(ctx, x + 2, y + 1, 3, 5, col); R().rect(ctx, x + 1, y + 5, 1, 2, col); R().rect(ctx, x + 5, y + 5, 1, 2, col);
   };
   // Ochtendlevering als melding linksonder (in plaats van de hint)
   UI.deliveryNote = function (app) {
