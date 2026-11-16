@@ -666,6 +666,10 @@
     const x = UI.panelFrame(app, ctx, 'Gisteren');
     if (!sm) { F().draw(ctx, 'Nog geen verkoopdag gehad.', x + 12, PY + 30, P.stone1); return; }
     F().draw(ctx, `${CC.CONFIG.dayNamesLong[sm.day]}, week ${sm.week}`, x + PW - 30, PY + 10, P.wood2, { align: 'right' });
+    // taak 2: ook hier de kasgrafiek, met dezelfde knop
+    const cbx = x + 9 + F().width('Gisteren') + 24;
+    UI.btn(app, ctx, 'ld_chart', cbx, PY + 7, 58, 13, CC.TEXT.cashChart.btn, () => { app.cashChartOn = !app.cashChartOn; }, { tone: 'wood', active: !!app.cashChartOn, tip: CC.TEXT.cashChart.btnTip });
+    if (app.cashChartOn) { UI.cashChart(app, ctx, x + 10, PY + 32, PW - 22, 170); return; }
     let y = PY + 28;
     // per wijn
     const cols = [['Wijn', 14, 'left'], ['Prijs', 108, 'left'], ['Verk.', 172, 'right'], ['Marge', 214, 'right'], ['Duur', 248, 'right'], ['Op', 282, 'right']];
@@ -1000,6 +1004,10 @@
     const x = 140, y = 42, w = 360, h = 262;
     R().panel(ctx, x, y, w, h);
     UI.ornateTitle(ctx, 'ZONDAG', x + w / 2, y + 14, P.bord2, { shadow: P.gold });
+    // taak 2: knop Verloop wisselt het weekoverzicht en de meters voor de kasgrafiek (bovenin is geen 150 × 60 vrij)
+    UI.btn(app, ctx, 'sun_chart', x + w - 70, y + 9, 58, 14, CC.TEXT.cashChart.btn, () => { app.cashChartOn = !app.cashChartOn; }, { tone: 'wood', active: !!app.cashChartOn, tip: CC.TEXT.cashChart.btnTip });
+    if (app.cashChartOn) UI.cashChart(app, ctx, x + 14, y + 30, w - 28, 92);
+    else {
     // weekoverzicht
     const wk = s.history.filter(hh => hh.week === s.week);
     const sum = k => wk.reduce((a, b) => a + (b[k] || 0), 0);
@@ -1021,6 +1029,7 @@
     F().draw(ctx, `${R().euro(paid)} van ${R().euro(total)}`, x + 190, y + 71, P.stone1);
     UI.koersMeter(app, ctx, x + 190, y + 86);   // B3
     }
+    }
     // gesprek
     const by = y + 128;
     R().rect(ctx, x + 12, by - 4, w - 24, 1, P.cream1);
@@ -1041,6 +1050,87 @@
       UI.btn(app, ctx, 'newweek', bx, byy, 130, 20, `Week ${s.week + 1} ▶`, () => app.bankNextWeek(), { tone: 'bord' });
       if (s.postponed && s.status === 'playing') UI.restartBtn(app, ctx, bx + 136, byy, 112, 20);   // A8: na uitstel
     }
+  };
+  // ---------- Kasgrafiek (20_HANDOFF taak 2) ----------
+  // Kas aan het eind van elke verkoopdag (s.history[].cash) tegenover de termijn van elke zondag ("de lat").
+  // Alleen lezen: rekent nergens mee. De lat van een voorbije week komt uit de geschiedenis: termijn + uitgesteld bedrag
+  // + boete. Uitstel is alleen mogelijk als de kas op zaterdagavond niet reikt (main.js openSunday), dus een week is
+  // uitgesteld precies als die kas onder de lat lag; zo klopt het ook voor een oud bewaard spel zonder extra velden.
+  UI.cashChartData = function (s) {
+    const S = CC.SIM, C = CC.CONFIG, D = C.daysPerWeek, R0 = S.repaySched(s);
+    const all = (s.history || []).filter(h => h && typeof h.cash === 'number' && isFinite(h.cash) && h.week >= 1 && h.day >= 0 && h.day < D);
+    const days = s.status === 'playing' ? all : all.slice(-48);   // vrij doorspelen: de laatste 48
+    const sat = {}; for (const h of s.history || []) if (h && typeof h.cash === 'number' && h.day === D - 1) sat[h.week] = h.cash;
+    const live = s.status === 'playing' && S.inLoan(s), K = live ? s.week : null;
+    // voorbije weken: termijn + wat er was uitgesteld (+ boete)
+    const weeks = {}; let carry = 0;
+    for (let w = 1; w <= R0.length; w++) {
+      if (K != null && w >= K) break;
+      const due = R0[w - 1] + carry, late = sat[w] != null && sat[w] < due;
+      weeks[w] = { week: w, due, red: late, dotted: false };
+      carry = late ? due + C.postponeFine : 0;
+    }
+    if (K != null) {
+      const done = S.bankDone(s);
+      const due = done ? R0[K - 1] + carry : S.weekDue(s);
+      weeks[K] = { week: K, due, red: done && s.carry > 0, dotted: false, upcoming: !done };
+      if (K < R0.length) weeks[K + 1] = { week: K + 1, due: R0[K] + (done ? s.carry : 0), red: false, dotted: true, upcoming: true };
+    }
+    const w0 = days.length ? days[0].week : (K || 1);
+    let w1 = days.length ? days[days.length - 1].week : w0;
+    if (K != null) w1 = Math.max(w1, K < R0.length ? K + 1 : K);
+    const lats = Object.values(weeks).filter(x => x && x.week >= w0 && x.week <= w1);
+    const top = Math.max(0, ...days.map(h => h.cash), ...lats.filter(x => x.upcoming).map(x => x.due));
+    return { days, weeks: lats, w0, w1, top };
+  };
+  UI.niceTop = function (v) {
+    const steps = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 25000, 50000, 100000];
+    const st = steps.find(x => Math.ceil(v / x) <= 3) || steps[steps.length - 1];
+    const n = Math.max(2, Math.ceil(v / st));
+    return { top: n * st, step: st, n };
+  };
+  UI.cashChart = function (app, ctx, x, y, w, h) {
+    const s = app.s, D = CC.CONFIG.daysPerWeek, cd = UI.cashChartData(s);
+    const sc = UI.niceTop(Math.max(1, cd.top));
+    const labW = Math.max(...Array.from({ length: sc.n }, (_, i) => F().width(R().euro((i + 1) * sc.step)))) + 4;
+    const nW = cd.w1 - cd.w0 + 1, px = Math.max(1, Math.floor((w - labW - 2) / (nW * D)));
+    const pw = px * D * nW, gx = x + labW + 1, gy = y + 2, gh = h - 14;   // plot: gx..gx+pw, gy..gy+gh
+    const Y = v => gy + gh - Math.round(Math.max(0, Math.min(sc.top, v)) / sc.top * gh);
+    const X = (wk, d) => gx + ((wk - cd.w0) * D + d) * px;
+    R().rect(ctx, gx, gy, pw, gh + 1, P.cream3);
+    // hulplijnen met bedrag
+    for (let i = 1; i <= sc.n; i++) {
+      const yy = Y(i * sc.step);
+      R().rect(ctx, gx, yy, pw, 1, P.cream1);
+      F().draw(ctx, R().euro(i * sc.step), gx - 3, yy - 4, P.stone1, { align: 'right' });
+    }
+    R().rect(ctx, gx, gy + gh, pw, 1, P.stone2);
+    F().draw(ctx, '€0', gx - 3, gy + gh - 4, P.stone1, { align: 'right' });
+    // weken: dunne lijntjes ertussen, weeknummer eronder
+    for (let wk = cd.w0; wk <= cd.w1; wk++) {
+      if (wk > cd.w0) R().rect(ctx, X(wk, 0), gy, 1, gh + 1, P.cream1);
+      F().draw(ctx, String(wk), X(wk, 0) + Math.round(px * D / 2), gy + gh + 3, wk === (s.status === 'playing' ? s.week : -1) ? P.bord2 : P.stone1, { align: 'center' });
+    }
+    // de lat: termijn per zondag (rood = uitgesteld, gestippeld = de week na de komende zondag)
+    for (const L of cd.weeks) {
+      const yy = Y(L.due), x0 = X(L.week, 0) + 1, x1 = X(L.week, D) - 1, col = L.red ? P.red : P.gold;
+      if (L.dotted) for (let xx = x0; xx < x1; xx += 2) R().rect(ctx, xx, yy, 1, 1, col);
+      else R().rect(ctx, x0, yy, x1 - x0, 1, col);
+    }
+    // de lijn: kas aan het eind van elke verkoopdag, in stapjes (dag lang vlak, dan omhoog of omlaag)
+    let prev = null;
+    for (const hd of cd.days) {
+      const xa = X(hd.week, hd.day), yy = Y(hd.cash);
+      const cont = prev && (prev.week * D + prev.day) + 1 === hd.week * D + hd.day;
+      if (cont) { const yp = Y(prev.cash); R().rect(ctx, xa, Math.min(yp, yy), 1, Math.abs(yy - yp) + 1, P.ink); }
+      R().rect(ctx, xa, yy, px, 1, P.ink);
+      prev = hd;
+    }
+    if (prev) { const lx = X(prev.week, prev.day) + px - 1, ly = Y(prev.cash); R().rect(ctx, lx - 1, ly - 1, 3, 3, P.gold); R().rect(ctx, lx, ly, 1, 1, P.gold2); }
+    if (!cd.days.length) F().draw(ctx, CC.TEXT.cashChart.empty, gx + 4, gy + 4, P.stone1);
+    // hover per dag: "Wo week 3 · kas €412"
+    for (const hd of cd.days) UI.hit(app, 'cc_' + hd.week + '_' + hd.day, X(hd.week, hd.day), gy, px, gh + 1, null,
+      CC.TEXT.cashChart.tip.split('{day}').join(CC.CONFIG.dayNames[hd.day]).split('{week}').join(hd.week).split('{cash}').join(R().euro(Math.round(hd.cash))));
   };
   // B3: op-koers-meter. Drie vakjes (te weinig · krap · ruim), het actieve fel, met één regel uitleg en een tooltip
   // die het voorrekent. Zelfde getallen als de tooltip op de aflossingsbalk (SIM.onCourse).

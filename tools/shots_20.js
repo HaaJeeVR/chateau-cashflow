@@ -74,6 +74,41 @@ const server = http.createServer((req, res) => {
       await page.screenshot({ path: path.join(OUT, 'T1-gisteren-tooltip.png') }); console.log('  T1-gisteren-tooltip.png  (' + h.tip + ')');
     } else console.log('  geen tooltip-regel in Gisteren');
   }
+  if (ONLY === 'taak2') {
+    // Taak 2: kasgrafiek. Spelstanden van de alles-bot (DUMP=map node tools/balance.js), zondag vóór betalen.
+    const DUMP = process.env.DUMP || '/tmp/dump';
+    const load = f => JSON.parse(fs.readFileSync(path.join(DUMP, f), 'utf8'));
+    const sunday = async (st, name, hover) => {
+      await ev(st => { st.flags.introSeen = true; app.s = st; app.rebuildRoom(); app.openSunday(); app.ring = null; app.cashChartOn = true; }, st);
+      await frames(4);
+      if (hover) {
+        const h = await ev(() => { const hs = CC.UI.hits.filter(h => h.id.startsWith('cc_')); const h = hs[Math.max(0, hs.length - 9)]; return h && { x: h.x, y: h.y, w: h.w, h: h.h, tip: h.tip }; });
+        const b = await page.locator('#game').boundingBox(), k = b.width / 640;
+        await page.mouse.move(b.x + (h.x + h.w / 2) * k, b.y + (h.y + h.h / 2) * k); await wait(900); await frames(3);
+        await page.screenshot({ path: path.join(OUT, name + '.png') }); console.log('  ' + name + '.png  (' + h.tip + ')');
+      } else await shot(name);
+    };
+    await sunday(load('alles_1000_wk1.json'), 'T2-zondag-week1');
+    await sunday(load('alles_1000_wk4.json'), 'T2-zondag-week4');
+    await sunday(load('alles_1007_wk7.json'), 'T2-zondag-week7-uitstel');
+    await sunday(load('alles_1000_wk7.json'), 'T2-zondag-week7-hover', true);
+    // zelfde zondag zonder grafiek (knop Verloop uit): het venster zoals het was
+    await ev(() => { app.cashChartOn = false; }); await shot('T2-zondag-week7-overzicht');
+    // Gisteren tijdens het voorbereiden (woensdag week 5)
+    await ev(st => {
+      st.flags.introSeen = true; st.history = st.history.filter(h => h.week < 5 || (h.week === 5 && h.day < 2));
+      st.week = 5; st.day = 2; st.cash = st.history[st.history.length - 1].cash; st.bankDoneWeek = 4; st.carry = 0; st.sun = null; st.mishap = null; st.resultOpen = false;
+      app.s = st; app.rebuildRoom(); app.startPrep(); while (app.notice) app.closeNotice(); app.cashChartOn = true; app.openPanel('lastday');
+    }, load('alles_1000_wk5.json'));
+    await wait(400); await shot('T2-gisteren-week5');
+    // oud bewaard spel: dagen zonder kas, zonder loan/carry/bankDoneWeek; via localStorage laden zoals "Doorgaan"
+    const old = load('alles_1007_wk7.json');
+    old.history.forEach((h, i) => { if (i % 3 === 0) delete h.cash; }); delete old.loan; delete old.bankDoneWeek; delete old.sun;
+    await ev(st => { localStorage.setItem('chateau-cashflow-save-v1', JSON.stringify(st)); }, old);
+    await page.reload(); await wait(700);
+    await ev(() => { app.continueGame(); app.ring = null; app.cashChartOn = true; });
+    await frames(4); await shot('T2-oud-spel-geladen');
+  }
   if (errors.length) console.log('FOUTEN in de pagina:\n' + errors.join('\n'));
   await browser.close(); server.close();
 })();

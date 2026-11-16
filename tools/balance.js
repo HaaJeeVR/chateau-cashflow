@@ -8,6 +8,7 @@
 //   NOCARDS=1            zonder weekkaarten en tegenvallers · NOMISHAP=1 · NOPICK=1
 //   CARDS=oud            oude, simpele kaartwaardering (vergelijken)
 //   REPAY=100,150,...    aflossing overschrijven
+//   DUMP=map             elke zondag de spelstand vóór betalen als JSON (screenshots)
 //   HASH=1               vingerafdruk van alle runs (uitkomst per run + totale marge): exact gelijk vóór en na?
 const path = require('path');
 const src = f => require(path.join(__dirname, '..', 'src', f));
@@ -369,6 +370,7 @@ function run(botName, seed) {
       STAT.wages += S.wages(s);
       lastSold = d.log.perWine;
     }
+    if (process.env.DUMP) require('fs').writeFileSync(require('path').join(process.env.DUMP, `${botName}_${seed}_wk${s.week}.json`), JSON.stringify(s));   // zondag vóór betalen (screenshots)
     const r = S.payWeek(s);
     if (!r.ok) { if (!S.postpone(s).ok) { S.bankrupt(s); return { win: false, week: s.week, level: s.level, cash: s.cash, w1min }; } STAT.postponed++; }
     if (S.onCourse) { const oc = S.onCourse(s); if (oc && s.week >= 3 && s.week <= 7) (KOERS[s.week] = KOERS[s.week] || []).push([oc.state, s]); }

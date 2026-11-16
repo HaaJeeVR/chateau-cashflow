@@ -41,6 +41,13 @@
       ],
       browsing: ['...', 'Hmm...', 'Eens kijken...', 'Rood of wit...'],
     },
+    // Kasgrafiek op zondag en in Gisteren (20_HANDOFF taak 2)
+    cashChart: {
+      btn: 'Verloop',
+      btnTip: 'Kas aan het eind van elke dag, tegenover de termijn van elke zondag (goud). Rood: die week uitgesteld. Gestippeld: de termijn daarna.',
+      tip: '{day} week {week} · kas {cash}',
+      empty: 'Nog geen verkoopdagen.',
+    },
     // Gisteren (20_HANDOFF taak 1): tooltip bij een wijn op Normaal waarvan kopers ook de stevige prijs hadden betaald
     lastDay: {
       room1: '1 koper had ook de stevige prijs betaald.',
