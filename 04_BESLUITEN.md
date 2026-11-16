@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-11-16 — Drie punten uit de vergelijking met open source games (`claude/20_HANDOFF_VERGELIJKING.md`)
+
+| # | Besluit | Reden |
+|---|---|---|
+| 125 | **Groene ballon "dit had meer mogen kosten" (taak 1, alleen beeld).** Bij een gewone koper van een wijn op Normaal (geen adviesklant, geen tweede kans van Fatima) telt `DAY.roomFor` of hij ook bij Stevig had gekocht: stevige prijs ≤ `SIM.budgetOf`, zijn score met de al getrokken ruis (`SIM.decide` geeft `score` terug) min het extra `SIM.pricePenalty` ≥ `buyThreshold`, en `SIM.priceVerdict(…, 'stevig', …)` zegt "koopt". Telling per wijn in `log.wines[id].room`, ook zonder ballon; in "Gisteren" kleurt de stand groen met een tooltip ("4 kopers hadden ook de stevige prijs betaald."), niet op de kassabon. Bij het afrekenen met kans 0,3 een ballon uit `bubble.bargain` (zinnen van Fable) in plaats van de gewone: hoogstens 3 per dag, niet dezelfde wijn binnen 5 s. Kans en zin uit een eigen reeks per klant (`DAY.custRng`: dagzaad + klantnummer), zin niet twee keer achter elkaar binnen de dag; `d.rng` trekt precies wat hij al trok. Uiterlijk (keuze HJ): rand `P.green3` en vulling `#e9f2dc`, als het goed-nieuwskader van het avondinzicht, want de gewone koopballon heeft al een groene rand. Telt mee in de regel van drie ballonnen. Controle: `tools/koopje.js`; test: `tools/test_koopje.js`; oplevering `claude/21_OPLEVERING_GROENE_BALLON.md`. | OpenRCT2 geeft het signaal in beide richtingen; gemiste marge viel niet op (besluit 45). |
+
+---
+
 ## 2026-11-13 — Pakket B, vervolg (branch `pakket-b`, bouwt op `nieuwe-achtergrond`)
 
 | # | Besluit | Reden |

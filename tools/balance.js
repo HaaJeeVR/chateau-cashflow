@@ -8,6 +8,7 @@
 //   NOCARDS=1            zonder weekkaarten en tegenvallers · NOMISHAP=1 · NOPICK=1
 //   CARDS=oud            oude, simpele kaartwaardering (vergelijken)
 //   REPAY=100,150,...    aflossing overschrijven
+//   HASH=1               vingerafdruk van alle runs (uitkomst per run + totale marge): exact gelijk vóór en na?
 const path = require('path');
 const src = f => require(path.join(__dirname, '..', 'src', f));
 const CC = src('config.js'); src('texts.js'); src('font.js'); src('state.js'); src('sim.js'); src('render.js'); src('world.js');
@@ -393,6 +394,7 @@ for (const name of ONLY) {
     }
     console.log(`  koers ${name}: ` + line.join(' | '));
   }
+  if (process.env.HASH) console.log(`  vingerafdruk ${name}: ` + require('crypto').createHash('sha1').update(JSON.stringify(res) + '|' + STAT.profit + '|' + STAT.days).digest('hex').slice(0, 12));   // exact gelijk vóór/na een wijziging?
   const wins = res.filter(r => r.win);
   const med = a => { if (!a.length) return '-'; a = a.slice().sort((x, y) => x - y); return Math.round(a[a.length >> 1]); };
   const fails = {}; res.filter(r => !r.win).forEach(r => fails[r.week] = (fails[r.week] || 0) + 1);

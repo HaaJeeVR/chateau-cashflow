@@ -16,6 +16,17 @@
         'Voor die prijs proef ik hem wel thuis.',
         'Ik kwam voor de aanbieding. Ik ga weg met drie flessen.',
       ],
+      // 20_HANDOFF taak 1 (Fable): koper die ook de stevige prijs had betaald (groene ballon)
+      bargain: [
+        'Dat is geen geld.',
+        'Hier zit vast een addertje in.',
+        'Dit vertel ik niet verder.',
+        'Goedkoper dan op vakantie.',
+        'Klopt dat prijsje wel?',
+        'Voor die prijs neem ik er twee. Nee, één.',
+        'Ik had meer meegenomen. Geld, bedoel ik.',
+        'Weet de eigenaar hiervan?',
+      ],
       tooExpensive: [
         'Voor dat geld ga ik naar de Appie.', 'Zoveel? Voor druivensap?', 'Ik kijk even verder.',
         'Pfoe. Nee.', 'Is dat de prijs per doos?', 'Mijn budget zegt nee.', 'Ik wacht de aanbieding af.',
@@ -29,6 +40,11 @@
         'Ik kwam speciaal voor de {wine}.', 'Leeg? Dan ga ik wel naar de Gall.',
       ],
       browsing: ['...', 'Hmm...', 'Eens kijken...', 'Rood of wit...'],
+    },
+    // Gisteren (20_HANDOFF taak 1): tooltip bij een wijn op Normaal waarvan kopers ook de stevige prijs hadden betaald
+    lastDay: {
+      room1: '1 koper had ook de stevige prijs betaald.',
+      room: '{n} kopers hadden ook de stevige prijs betaald.',
     },
     result: {
       title: 'Kassabon',

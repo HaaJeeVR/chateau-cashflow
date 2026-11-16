@@ -1100,13 +1100,15 @@
       bx = Math.max(2, Math.min(R.W - w - 2, Math.round(x - w / 2))); by = Math.max(18, Math.round(y - h - 5));
     }
     if (placed) placed.push({ x: bx, y: by, w, h });
-    const border = { red: P.red, grey: P.stone1, bord: P.bord3, gold: P.gold, green: P.ok }[tone] || P.ink;
+    // bargain (20_HANDOFF taak 1): rand en vulling van het "goed nieuws"-kader in het avondinzicht (UI.insightBox)
+    const border = { red: P.red, grey: P.stone1, bord: P.bord3, gold: P.gold, green: P.ok, bargain: P.green3 }[tone] || P.ink;
+    const fill = tone === 'bargain' ? '#e9f2dc' : P.cream3;
     ctx.globalAlpha = alpha == null ? 1 : alpha;
     R.round(ctx, bx, by, w, h, 4, border);
-    R.round(ctx, bx + 1, by + 1, w - 2, h - 2, 3, P.cream3);
+    R.round(ctx, bx + 1, by + 1, w - 2, h - 2, 3, fill);
     // staartje
     const tx = Math.max(bx + 3, Math.min(bx + w - 6, Math.round(x) - 2));
-    R.rect(ctx, tx, by + h, 4, 1, border); R.rect(ctx, tx + 1, by + h, 2, 1, P.cream3);
+    R.rect(ctx, tx, by + h, 4, 1, border); R.rect(ctx, tx + 1, by + h, 2, 1, fill);
     R.rect(ctx, tx + 1, by + h + 1, 2, 1, border); R.rect(ctx, tx + 1, by + h + 2, 1, 1, border);
     lines.forEach((l, i) => CC.FONT.draw(ctx, l, bx + 4, by + 3 + i * 10, P.ink));
     ctx.globalAlpha = 1;

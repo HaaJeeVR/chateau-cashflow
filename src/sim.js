@@ -260,7 +260,7 @@
     // 14_PRIJZEN: wie de aanbieding koopt, neemt soms een fles extra ("Aanbieding? Dan neem ik er twee.")
     const offer = s.prices[pick.wine.id] === 'aanbieding';
     if (offer && c.offer.extraQty && qty < 3 && rng() < c.offer.extraQty) qty++;
-    return { action: 'buy', wineId: pick.wine.id, qty, price: pick.price, missed, offer, log };
+    return { action: 'buy', wineId: pick.wine.id, qty, price: pick.price, missed, offer, score: pick.score, log };   // score (met de getrokken ruis): voor de groene ballon (20_HANDOFF taak 1), verandert niets aan de keuze
   };
 
   // Flessen uit het schap pakken (kan minder zijn als iemand anders net was).

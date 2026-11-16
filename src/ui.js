@@ -680,7 +680,9 @@
       if (i % 2 === 0) R().round(ctx, x + 8, y - 2, PW - 16, 12, 3, P.cream3);
       const st = stands[id] ? CC.standById(stands[id]).name : '-';
       F().draw(ctx, wn.name, x + 14, y, P.ink);
-      F().draw(ctx, st, x + 108, y, stands[id] === 'aanbieding' ? P.green2 : (stands[id] === 'stevig' ? P.bord3 : P.stone1));
+      F().draw(ctx, st, x + 108, y, stands[id] === 'aanbieding' ? P.green2 : (stands[id] === 'stevig' ? P.bord3 : (ws.room ? P.green3 : P.stone1)));
+      // 20_HANDOFF taak 1: wie had ook de stevige prijs betaald? (alleen tooltip; niet op de kassabon)
+      if (ws.room) UI.hit(app, 'ld_room_' + id, x + 10, y - 2, PW - 20, 12, null, (ws.room === 1 ? CC.TEXT.lastDay.room1 : CC.TEXT.lastDay.room).split('{n}').join(String(ws.room)));
       F().draw(ctx, String(ws.sold), x + 172, y, ws.sold ? P.ink : P.stone2, { align: 'right' });
       F().draw(ctx, R().euro(ws.margin), x + 214, y, ws.margin ? P.green2 : P.stone2, { align: 'right' });
       F().draw(ctx, String(ws.tooExpensive), x + 248, y, ws.tooExpensive ? P.red : P.stone2, { align: 'right' });

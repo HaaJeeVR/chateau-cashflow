@@ -78,7 +78,7 @@
       x: RM.door.x + 0.4, y: RM.door.y + jitter, alpha: 0, face: -1,
       path: [], state: 'enter', timer: 0, moving: false, walkPhase: 0,
       bubble: null, carry: null, want: null,
-      advice: !!p.advice, ask: null, patience: 0, src: p.src || null,
+      advice: !!p.advice, wasAdvice: !!p.advice, ask: null, patience: 0, src: p.src || null,
     };
     SIM().recordVisit(d.log, p.type, p.src);
     // uiterlijk: willekeurige variant van het type (assets/sprites.js), niet twee keer dezelfde achter elkaar.
@@ -98,6 +98,25 @@
   }
 
   function say(c, text, tone, dur) { c.bubble = { text, tone, t: dur || 2.4 }; }
+
+  // Eigen toevalsreeks per klant (dagzaad + klantnummer) voor wat alleen beeld is: d.rng blijft onaangeroerd,
+  // dus de dag verschuift niet, en een nagespeelde dag geeft hetzelfde beeld (20_HANDOFF taak 1 en 3).
+  DAY.custRng = function (s, c) {
+    return c.vr || (c.vr = CC.makeRng({ rng: ((s.seed >>> 0) * 13 + s.week * 2003 + s.day * 151 + c.id * 7919 + 11) >>> 0 }));
+  };
+  // 20_HANDOFF taak 1: had deze klant de wijn ook bij Stevig gekocht? Alleen een gewone koper van een wijn op Normaal
+  // (geen adviesklant, geen tweede kans van Fatima). Zijn eigen score (met de ruis die al getrokken is) min het extra
+  // prijsbezwaar blijft boven de koopdrempel, de stevige prijs past in zijn budget, en zijn type haakt bij Stevig niet af
+  // volgens het prijsvenster (SIM.priceVerdict). Rekent alleen; trekt niets uit een rng.
+  DAY.roomFor = function (d, s, c, dec) {
+    if (!dec || dec.action !== 'buy' || dec.score == null || c.wasAdvice || c.fatima || dec.fatima || dec.advice) return false;
+    if (s.prices[dec.wineId] !== 'normaal') return false;
+    const w = CC.wineById(dec.wineId), t = CC.CUSTOMER_TYPES[c.type], S = SIM();
+    if (CC.priceFor(w, 'stevig') > S.budgetOf(s, c)) return false;
+    const extra = S.pricePenalty(t, CC.standById('stevig').factor) - S.pricePenalty(t, CC.standById('normaal').factor);
+    if (dec.score - extra < CC.CONFIG.buyThreshold) return false;
+    return S.priceVerdict(s, w, 'stevig', c.type, d.plan).verdict === 'koopt';
+  };
 
   function walk(c, dt) {
     if (!c.path.length) { c.moving = false; return true; }
@@ -181,6 +200,7 @@
             if (d.decisions.length > 50) d.decisions.shift();
             if (dec.action === 'buy') {
               c.want = dec;
+              c.room = DAY.roomFor(d, s, c, dec);
               const vak = SIM().vakOfWine(s, dec.wineId);
               const f = CC.FURNITURE.find(ff => ff.vakken && ff.vakken.includes(vak));
               const spot = CC.shelfSpot(f);
@@ -261,6 +281,7 @@
           c.timer -= dt;
           if (c.timer <= 0) {
             const rev = SIM().paySale(s, d.log, c.want.wineId, c.want.qty, c.want.price, c.type, c.src);
+            if (c.room) { const ws = d.log.wines[c.want.wineId]; ws.room = (ws.room || 0) + 1; }   // taak 1: ook zonder ballon tellen
             if (CC.FX && d.visual) {
               const rg = CC.BG && CC.BG.register, [sx, sy] = rg ? [rg.x + rg.w / 2, rg.y + 4] : ((p => [p[0] + 18, p[1] - 30])(CC.R.iso(RM.counter.x, RM.counter.y)));
               CC.FX.coins(sx, sy);
@@ -272,6 +293,19 @@
             const dr = d.log.lastRep || 0;
             d.floats.push({ cash: true, text: '+' + CC.R.euro(rev), rep: dr, x: RM.counter.x - 0.7, y: RM.counter.y - 0.7, t: 1.6, max: 1.6, stack, col: CC.PAL.gold2 });
             if (d.rng() < (c.want && c.want.offer ? 0.45 : 0.25)) say(c, CC.pickText(c.want && c.want.offer ? T.offerBought : T.bought, d.rng), 'green', 1.8);   // 14_PRIJZEN: eigen zinnen bij de aanbieding
+            // 20_HANDOFF taak 1: groene ballon "dit had meer mogen kosten", in plaats van de gewone. Kans en zin uit de eigen
+            // reeks van de klant (de regel hierboven trekt nog precies hetzelfde uit d.rng). Hoogstens 3 per dag,
+            // niet twee keer dezelfde wijn binnen 5 s.
+            if (c.room) {
+              const r = DAY.custRng(s, c), at = d.bargainAt || (d.bargainAt = {}), id = c.want.wineId;
+              if (r() < 0.3 && (d.bargainN || 0) < 3 && !(id in at && d.t - at[id] < 5)) {
+                d.bargainN = (d.bargainN || 0) + 1; at[id] = d.t;
+                // zin: niet twee keer achter elkaar dezelfde, bijgehouden per dag (niet CC.pickText: dat onthoudt over dagen heen)
+                let k = Math.floor(r() * T.bargain.length); if (T.bargain.length > 1 && k === d.bargainLast) k = (k + 1) % T.bargain.length;
+                d.bargainLast = k;
+                say(c, T.bargain[k], 'bargain', 2.2);
+              }
+            }
             c.carry = null; c.bag = true;
             leave(c);
           }
